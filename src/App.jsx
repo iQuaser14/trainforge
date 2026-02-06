@@ -1,0 +1,1164 @@
+import { useState, useEffect, useCallback, useMemo } from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
+// ─── EXERCISE LIBRARY ───
+const EXERCISES = {
+  mobility: [
+    { id: "m1", name: "Hip Circles", category: "mobility", equipment: "none", focus: "both" },
+    { id: "m2", name: "Leg Swings", category: "mobility", equipment: "none", focus: "both" },
+    { id: "m3", name: "Arm Circles", category: "mobility", equipment: "none", focus: "both" },
+    { id: "m4", name: "Cat-Cow", category: "mobility", equipment: "none", focus: "both" },
+    { id: "m5", name: "World's Greatest Stretch", category: "mobility", equipment: "none", focus: "both" },
+    { id: "m6", name: "Band Pull-Aparts", category: "mobility", equipment: "band", focus: "A" },
+    { id: "m7", name: "Ankle Mobility", category: "mobility", equipment: "none", focus: "A" },
+    { id: "m8", name: "Thoracic Rotations", category: "mobility", equipment: "none", focus: "both" },
+    { id: "m9", name: "Deep Squat Hold", category: "mobility", equipment: "none", focus: "A" },
+    { id: "m10", name: "Banded Clamshells", category: "mobility", equipment: "band", focus: "B" },
+    { id: "m11", name: "Foam Roll Quads", category: "mobility", equipment: "foam roller", focus: "A" },
+    { id: "m12", name: "Foam Roll T-Spine", category: "mobility", equipment: "foam roller", focus: "both" },
+    { id: "m13", name: "Banded Shoulder Dislocates", category: "mobility", equipment: "band", focus: "A" },
+    { id: "m14", name: "90/90 Hip Stretch", category: "mobility", equipment: "none", focus: "B" },
+    { id: "m15", name: "Scapular Push-Ups", category: "mobility", equipment: "none", focus: "A" },
+    { id: "m16", name: "Inchworms", category: "mobility", equipment: "none", focus: "both" },
+  ],
+  compound_push_squat: [
+    { id: "cps1", name: "Back Squat", category: "compound", equipment: "barbell", muscles: ["quads", "glutes"], focus: "A" },
+    { id: "cps2", name: "Front Squat", category: "compound", equipment: "barbell", muscles: ["quads", "core"], focus: "A" },
+    { id: "cps3", name: "Bench Press", category: "compound", equipment: "barbell", muscles: ["chest", "triceps"], focus: "A" },
+    { id: "cps4", name: "Overhead Press", category: "compound", equipment: "barbell", muscles: ["shoulders", "triceps"], focus: "A" },
+    { id: "cps5", name: "Goblet Squat", category: "compound", equipment: "dumbbell/kettlebell", muscles: ["quads", "glutes"], focus: "A" },
+    { id: "cps6", name: "Floor Press", category: "compound", equipment: "barbell/dumbbell", muscles: ["chest", "triceps"], focus: "A" },
+    { id: "cps7", name: "Dumbbell Bench Press", category: "compound", equipment: "dumbbells", muscles: ["chest", "triceps"], focus: "A" },
+    { id: "cps8", name: "Push Press", category: "compound", equipment: "barbell", muscles: ["shoulders", "triceps", "legs"], focus: "A" },
+    { id: "cps9", name: "Leg Press 45°", category: "compound", equipment: "machine", muscles: ["quads", "glutes"], focus: "A" },
+    { id: "cps10", name: "DB Floor Press", category: "compound", equipment: "dumbbells", muscles: ["chest", "triceps"], focus: "A" },
+    { id: "cps11", name: "Push-Up", category: "compound", equipment: "none", muscles: ["chest", "triceps"], focus: "A" },
+  ],
+  compound_pull_hinge: [
+    { id: "cph1", name: "Deadlift", category: "compound", equipment: "barbell", muscles: ["posterior chain"], focus: "B" },
+    { id: "cph2", name: "Romanian Deadlift", category: "compound", equipment: "barbell", muscles: ["hamstrings", "glutes"], focus: "B" },
+    { id: "cph3", name: "Barbell Row", category: "compound", equipment: "barbell", muscles: ["back", "biceps"], focus: "B" },
+    { id: "cph4", name: "Pull-Ups", category: "compound", equipment: "pull-up bar", muscles: ["back", "biceps"], focus: "B" },
+    { id: "cph5", name: "Sumo Deadlift", category: "compound", equipment: "barbell", muscles: ["glutes", "inner thigh"], focus: "B" },
+    { id: "cph6", name: "Trap Bar Deadlift", category: "compound", equipment: "trap bar", muscles: ["posterior chain"], focus: "B" },
+    { id: "cph7", name: "Pendlay Row", category: "compound", equipment: "barbell", muscles: ["back", "biceps"], focus: "B" },
+    { id: "cph8", name: "Chin-Ups", category: "compound", equipment: "pull-up bar", muscles: ["back", "biceps"], focus: "B" },
+    { id: "cph9", name: "DB Romanian Deadlift", category: "compound", equipment: "dumbbells", muscles: ["hamstrings", "glutes"], focus: "B" },
+    { id: "cph10", name: "1-Arm DB Row", category: "compound", equipment: "dumbbell", muscles: ["back", "biceps"], focus: "B" },
+  ],
+  accessory_push_squat: [
+    { id: "aps1", name: "Bulgarian Split Squat", category: "accessory", equipment: "dumbbells", muscles: ["quads", "glutes"], focus: "A" },
+    { id: "aps2", name: "Walking Lunges", category: "accessory", equipment: "dumbbells", muscles: ["quads", "glutes"], focus: "A" },
+    { id: "aps3", name: "Lateral Raises", category: "accessory", equipment: "dumbbells", muscles: ["shoulders"], focus: "A" },
+    { id: "aps4", name: "Tricep Dips", category: "accessory", equipment: "bench/bars", muscles: ["triceps"], focus: "A" },
+    { id: "aps5", name: "Incline Dumbbell Press", category: "accessory", equipment: "dumbbells", muscles: ["upper chest"], focus: "A" },
+    { id: "aps6", name: "Chest Flyes", category: "accessory", equipment: "dumbbells", muscles: ["chest"], focus: "A" },
+    { id: "aps7", name: "Step-Ups", category: "accessory", equipment: "box/bench", muscles: ["quads", "glutes"], focus: "A" },
+    { id: "aps8", name: "Reverse Lunges", category: "accessory", equipment: "dumbbells", muscles: ["quads", "glutes"], focus: "A" },
+    { id: "aps9", name: "Leg Press", category: "accessory", equipment: "machine", muscles: ["quads", "glutes"], focus: "A" },
+    { id: "aps10", name: "Leg Extension", category: "accessory", equipment: "machine", muscles: ["quads"], focus: "A" },
+    { id: "aps11", name: "Calf Raises", category: "accessory", equipment: "machine/step", muscles: ["calves"], focus: "A" },
+    { id: "aps12", name: "Tricep Pushdowns", category: "accessory", equipment: "cable", muscles: ["triceps"], focus: "A" },
+    { id: "aps13", name: "Arnold Press", category: "accessory", equipment: "dumbbells", muscles: ["shoulders"], focus: "A" },
+    { id: "aps14", name: "Cable Flyes", category: "accessory", equipment: "cable", muscles: ["chest"], focus: "A" },
+    { id: "aps15", name: "Sissy Squat", category: "accessory", equipment: "none", muscles: ["quads"], focus: "A" },
+    { id: "aps16", name: "Cable Tricep Extension", category: "accessory", equipment: "cable", muscles: ["triceps"], focus: "A" },
+    { id: "aps17", name: "Dumbbell Incline Press 90°", category: "accessory", equipment: "dumbbells", muscles: ["upper chest"], focus: "A" },
+    { id: "aps18", name: "Goblet Split Squat", category: "accessory", equipment: "dumbbell", muscles: ["quads", "glutes"], focus: "A" },
+    { id: "aps19", name: "Push-Up Negative (Ecc 3s)", category: "accessory", equipment: "none", muscles: ["chest", "triceps"], focus: "A" },
+    { id: "aps20", name: "Half Kneeling Press", category: "accessory", equipment: "dumbbell", muscles: ["shoulders"], focus: "A" },
+    { id: "aps21", name: "DB Seated Press", category: "accessory", equipment: "dumbbells/chair", muscles: ["shoulders"], focus: "A" },
+    { id: "aps22", name: "Push-Up Hand Release", category: "accessory", equipment: "none", muscles: ["chest", "triceps"], focus: "A" },
+    { id: "aps23", name: "DB Bridged Floor Press", category: "accessory", equipment: "dumbbells", muscles: ["chest", "glutes"], focus: "A" },
+    { id: "aps24", name: "Dip su Sedia", category: "accessory", equipment: "chair", muscles: ["triceps"], focus: "A" },
+    { id: "aps25", name: "SL Goblet Squat (Chair)", category: "accessory", equipment: "dumbbell/chair", muscles: ["quads", "glutes"], focus: "A" },
+  ],
+  accessory_pull_hinge: [
+    { id: "aph1", name: "Hip Thrust", category: "accessory", equipment: "barbell", muscles: ["glutes"], focus: "B" },
+    { id: "aph2", name: "Dumbbell Row", category: "accessory", equipment: "dumbbell", muscles: ["back"], focus: "B" },
+    { id: "aph3", name: "Face Pulls", category: "accessory", equipment: "cable", muscles: ["rear delts"], focus: "B" },
+    { id: "aph4", name: "Bicep Curls", category: "accessory", equipment: "dumbbells", muscles: ["biceps"], focus: "B" },
+    { id: "aph5", name: "Single-Leg RDL", category: "accessory", equipment: "dumbbell/kettlebell", muscles: ["hamstrings", "glutes"], focus: "B" },
+    { id: "aph6", name: "Seated Cable Row", category: "accessory", equipment: "cable", muscles: ["back"], focus: "B" },
+    { id: "aph7", name: "Leg Curl", category: "accessory", equipment: "machine/band", muscles: ["hamstrings"], focus: "B" },
+    { id: "aph8", name: "Lat Pulldown", category: "accessory", equipment: "cable", muscles: ["back"], focus: "B" },
+    { id: "aph9", name: "Good Mornings", category: "accessory", equipment: "barbell", muscles: ["hamstrings", "lower back"], focus: "B" },
+    { id: "aph10", name: "Hammer Curls", category: "accessory", equipment: "dumbbells", muscles: ["biceps"], focus: "B" },
+    { id: "aph11", name: "Reverse Flyes", category: "accessory", equipment: "dumbbells", muscles: ["rear delts"], focus: "B" },
+    { id: "aph12", name: "Cable Pull-Through", category: "accessory", equipment: "cable", muscles: ["glutes", "hamstrings"], focus: "B" },
+    { id: "aph13", name: "Glute Bridge", category: "accessory", equipment: "barbell/band", muscles: ["glutes"], focus: "B" },
+    { id: "aph14", name: "Inverted Row", category: "accessory", equipment: "bar/rings", muscles: ["back"], focus: "B" },
+    { id: "aph15", name: "Abductor Machine", category: "accessory", equipment: "machine", muscles: ["glutes"], focus: "B" },
+    { id: "aph16", name: "Cable Kickback", category: "accessory", equipment: "cable", muscles: ["glutes"], focus: "B" },
+    { id: "aph17", name: "RDL B-Stance DB", category: "accessory", equipment: "dumbbells", muscles: ["hamstrings", "glutes"], focus: "B" },
+    { id: "aph18", name: "DB SL Hip Thrust", category: "accessory", equipment: "dumbbell", muscles: ["glutes"], focus: "B" },
+    { id: "aph19", name: "Hamstring Bridge", category: "accessory", equipment: "none", muscles: ["hamstrings", "glutes"], focus: "B" },
+    { id: "aph20", name: "SL Hamstring Bridge", category: "accessory", equipment: "none", muscles: ["hamstrings", "glutes"], focus: "B" },
+    { id: "aph21", name: "Hamstring Sliding Curls", category: "accessory", equipment: "none", muscles: ["hamstrings"], focus: "B" },
+    { id: "aph22", name: "DB Hip Thrust + Band", category: "accessory", equipment: "dumbbell/band", muscles: ["glutes"], focus: "B" },
+    { id: "aph23", name: "Side Plank Clamshell", category: "accessory", equipment: "none", muscles: ["glutes"], focus: "B" },
+    { id: "aph24", name: "Plank Row (Chair)", category: "accessory", equipment: "dumbbell/chair", muscles: ["back"], focus: "B" },
+    { id: "aph25", name: "Bicep Curls DB", category: "accessory", equipment: "dumbbells", muscles: ["biceps"], focus: "B" },
+    { id: "aph26", name: "DB Tricep Extension", category: "accessory", equipment: "dumbbells", muscles: ["triceps"], focus: "B" },
+  ],
+  core: [
+    { id: "co1", name: "Plank", category: "core", equipment: "none" },
+    { id: "co2", name: "Dead Bug", category: "core", equipment: "none" },
+    { id: "co3", name: "Pallof Press", category: "core", equipment: "cable/band" },
+    { id: "co4", name: "Hanging Leg Raise", category: "core", equipment: "pull-up bar" },
+    { id: "co5", name: "Ab Wheel Rollout", category: "core", equipment: "ab wheel" },
+    { id: "co6", name: "Bird Dog", category: "core", equipment: "none" },
+    { id: "co7", name: "Russian Twist", category: "core", equipment: "weight plate" },
+    { id: "co8", name: "Hollow Hold", category: "core", equipment: "none" },
+    { id: "co9", name: "Side Plank", category: "core", equipment: "none" },
+    { id: "co10", name: "Farmer's Carry", category: "core", equipment: "dumbbells/kettlebells" },
+    { id: "co11", name: "Suitcase Carry", category: "core", equipment: "dumbbell/kettlebell" },
+    { id: "co12", name: "Copenhagen Plank", category: "core", equipment: "bench" },
+    { id: "co13", name: "Plank Commando", category: "core", equipment: "none" },
+    { id: "co14", name: "Plank Drag Through", category: "core", equipment: "dumbbell" },
+    { id: "co15", name: "Plank Reach", category: "core", equipment: "none" },
+    { id: "co16", name: "Reverse Crunch", category: "core", equipment: "none" },
+  ],
+  hiit: [
+    { id: "h1", name: "Burpees", category: "hiit", equipment: "none" },
+    { id: "h2", name: "Box Jumps", category: "hiit", equipment: "box" },
+    { id: "h3", name: "Kettlebell Swings", category: "hiit", equipment: "kettlebell" },
+    { id: "h4", name: "Battle Ropes", category: "hiit", equipment: "ropes" },
+    { id: "h5", name: "Rowing Intervals", category: "hiit", equipment: "rower" },
+    { id: "h6", name: "Assault Bike", category: "hiit", equipment: "assault bike" },
+    { id: "h7", name: "Wall Balls", category: "hiit", equipment: "med ball" },
+    { id: "h8", name: "Thrusters", category: "hiit", equipment: "barbell/dumbbells" },
+    { id: "h9", name: "Jump Rope", category: "hiit", equipment: "rope" },
+    { id: "h10", name: "Mountain Climbers", category: "hiit", equipment: "none" },
+    { id: "h11", name: "Ski Erg", category: "hiit", equipment: "ski erg" },
+    { id: "h12", name: "Sled Push", category: "hiit", equipment: "sled" },
+    { id: "h13", name: "Squat Jumps", category: "hiit", equipment: "none" },
+    { id: "h14", name: "Split Jumps", category: "hiit", equipment: "none" },
+    { id: "h15", name: "Up & Down", category: "hiit", equipment: "none" },
+    { id: "h16", name: "Wormwalk", category: "hiit", equipment: "none" },
+    { id: "h17", name: "DB Push Press", category: "hiit", equipment: "dumbbells" },
+    { id: "h18", name: "DB Deadlift", category: "hiit", equipment: "dumbbells" },
+    { id: "h19", name: "Reverse Lunges (Tempo)", category: "hiit", equipment: "dumbbells" },
+    { id: "h20", name: "Plank Commando", category: "hiit", equipment: "none" },
+  ],
+  running: [
+    { id: "r1", name: "Easy Run", category: "running", equipment: "none" },
+    { id: "r2", name: "Tempo Run", category: "running", equipment: "none" },
+    { id: "r3", name: "Interval Run", category: "running", equipment: "none" },
+    { id: "r4", name: "Long Run", category: "running", equipment: "none" },
+  ],
+};
+
+// ─── EQUIPMENT FILTER ───
+const GYM_ONLY = new Set(["cps1","cps2","cps3","cps4","cps6","cps8","cps9","cph1","cph2","cph3","cph4","cph5","cph6","cph7","cph8","aps5","aps9","aps10","aps12","aps14","aps15","aps16","aps17","aph6","aph7","aph8","aph9","aph12","aph15","aph16","co3","co4","co5","co12","h2","h4","h5","h6","h7","h11","h12"]);
+const filterLoc = (pool, loc) => loc === "home" ? pool.filter(e => !GYM_ONLY.has(e.id)) : pool;
+
+// ─── CARDIO PROGRAMMING ───
+function generateCardioDays(level, cardioDays, block) {
+  if (cardioDays === 0) return [];
+  const sessions = [];
+  const isB2 = block === 1;
+  const pools = {
+    beginner: [
+      { type: "Easy Run", warmup: "5' camminata + mobilità", work: isB2 ? "25' easy, conversational pace" : "20' easy, walk/run if needed", cooldown: "5' stretching", rpe: "5-6" },
+      { type: "Fartlek", warmup: "5' easy run + mobilità", work: isB2 ? "1' moderato + 1' easy × 24'" : "1' moderato + 1' easy × 20'", cooldown: "5' stretching", rpe: "6-7" },
+      { type: "Z2 Bike", warmup: "5'", work: "45' easy — conversational pace", cooldown: "5'", rpe: "5" },
+      { type: "Easy Run (Z2)", warmup: "5' camminata", work: isB2 ? "5k easy peasy" : "3-4k easy peasy", cooldown: "5' stretching", rpe: "5" },
+    ],
+    intermediate: [
+      { type: "Interval Run", warmup: "5' easy run + mobilità", work: isB2 ? "8×600m, rec 2' ferma" : "6×800m, rec 2' ferma", cooldown: "5' jogging + stretching", rpe: "8-9" },
+      { type: "Fartlek", warmup: "5' easy run + mobilità", work: isB2 ? "2' sostenuti + 1' veloce + 2' lenti × 30'" : "2' sostenuti + 2' lenti × 28'", cooldown: "5' jogging + stretching", rpe: "7-8" },
+      { type: "Z2 Bike", warmup: "5'", work: "45' easy — conversational pace", cooldown: "5'", rpe: "5" },
+      { type: "Easy Run (Z2)", warmup: "5'", work: isB2 ? "8k easy" : "7k easy", cooldown: "5' jogging + stretching", rpe: "5" },
+    ],
+    advanced: [
+      { type: "Speed Intervals", warmup: "5' easy run + mobilità", work: isB2 ? "10×400m, rec 90s" : "8×400m, rec 90s", cooldown: "5' jogging + stretching", rpe: "9" },
+      { type: "Tempo Run", warmup: "5' easy run + mobilità", work: isB2 ? "6km progressive" : "5km progressive", cooldown: "5' jogging + stretching", rpe: "8" },
+      { type: "Z2 Bike", warmup: "5'", work: isB2 ? "60' easy" : "45' easy", cooldown: "5'", rpe: "5" },
+      { type: "Long Run (Z2)", warmup: "5'", work: isB2 ? "10k easy" : "8k easy", cooldown: "5' stretching", rpe: "5-6" },
+    ],
+  };
+  const pool = pools[level] || pools.beginner;
+  for (let i = 0; i < Math.min(cardioDays, pool.length); i++) sessions.push({ ...pool[i], dayLabel: "Cardio " + (i+1) });
+  return sessions;
+}
+
+const ALL_EXERCISES = Object.values(EXERCISES).flat();
+const DURATION_CONFIG = {
+  45: { mobilityCount: 3, compoundCount: 2, accessoryCount: 1, coreCount: 1, hiitCount: 2, hiitRounds: 2 },
+  60: { mobilityCount: 3, compoundCount: 2, accessoryCount: 2, coreCount: 2, hiitCount: 3, hiitRounds: 3 },
+  75: { mobilityCount: 4, compoundCount: 2, accessoryCount: 3, coreCount: 2, hiitCount: 3, hiitRounds: 3 },
+  90: { mobilityCount: 4, compoundCount: 2, accessoryCount: 4, coreCount: 2, hiitCount: 4, hiitRounds: 4 },
+};
+const LEVEL_CONFIG = {
+  beginner: {
+    months1_2: { compoundSets: 3, compoundReps: "10-12", compoundRPE: "6", accessorySets: 2, accessoryReps: "12-15", accessoryRPE: "5-6", coreSets: 2, coreReps: "10-12", restCompound: 120, restAccessory: 90 },
+    months3_4: { compoundSets: 3, compoundReps: "8-10", compoundRPE: "7", accessorySets: 3, accessoryReps: "10-12", accessoryRPE: "6-7", coreSets: 3, coreReps: "10-12", restCompound: 120, restAccessory: 75 },
+  },
+  intermediate: {
+    month1: { compoundSets: 4, compoundReps: "6-8", compoundRPE: "7", accessorySets: 3, accessoryReps: "8-12", accessoryRPE: "7", coreSets: 3, coreReps: "10-15", restCompound: 150, restAccessory: 75 },
+    following: { compoundSets: 4, compoundReps: "4-6", compoundRPE: "8-9", accessorySets: 4, accessoryReps: "8-10", accessoryRPE: "8", coreSets: 3, coreReps: "12-15", restCompound: 180, restAccessory: 60 },
+  },
+  advanced: { base: { compoundSets: 5, compoundReps: "3-5", compoundRPE: "8-9", accessorySets: 4, accessoryReps: "6-10", accessoryRPE: "8-9", coreSets: 3, coreReps: "12-15", restCompound: 180, restAccessory: 60 } },
+};
+
+function getLevelConfig(level, monthNumber) {
+  if (level === "beginner") return monthNumber <= 2 ? LEVEL_CONFIG.beginner.months1_2 : LEVEL_CONFIG.beginner.months3_4;
+  if (level === "intermediate") return monthNumber <= 1 ? LEVEL_CONFIG.intermediate.month1 : LEVEL_CONFIG.intermediate.following;
+  return LEVEL_CONFIG.advanced.base;
+}
+function pickRandom(arr, count) { const s = [...arr].sort(() => Math.random() - 0.5); return s.slice(0, Math.min(count, arr.length)); }
+function buildDaySchedule(spw, d3 = "glute") { if (spw === 3) return ["Q", "H", d3 === "glute" ? "G" : "F"]; const s = []; for (let i = 0; i < spw; i++) s.push(i % 2 === 0 ? "A" : "B"); return s; }
+
+// ─── EXTRACT PREVIOUS PROGRAM EXERCISES ───
+function extractPrevIds(prev) {
+  if (!prev) return new Set();
+  const ids = new Set();
+  [prev.block1, prev.block2].forEach(block => { if (!block) return; block.forEach(day => { day.exercises.forEach(ex => { if (ex.section === "Strength" || ex.section === "Accessories") ids.add(ex.id); }); }); });
+  return ids;
+}
+
+function generateDay(dayType, levelCfg, durationCfg, block, usedExercises = new Set(), location = "gym", prevIds = new Set()) {
+  const exercises = [];
+  const P = {}; Object.keys(EXERCISES).forEach(k => { P[k] = filterLoc(EXERCISES[k], location); });
+  const isA = dayType === "A", isB = dayType === "B", isQ = dayType === "Q", isH = dayType === "H", isG = dayType === "G", isFB = dayType === "F";
+
+  // Mobility
+  const mobFocus = (isA || isQ) ? "A" : isB || isH ? "B" : "both";
+  pickRandom(P.mobility.filter(e => e.focus === "both" || e.focus === mobFocus), durationCfg.mobilityCount).forEach(ex => {
+    exercises.push({ ...ex, section: "Warm-Up", sets: 2, reps: "10 each", rest: 0, weight: "BW", rpe: "", notes: "" });
+  });
+
+  // pickFresh: prefer exercises NOT in current program AND NOT in previous program
+  const pickFresh = (pool, n) => {
+    const fresh = pool.filter(e => !usedExercises.has(e.id) && !prevIds.has(e.id));
+    if (fresh.length >= n) return pickRandom(fresh, n);
+    const notCurrent = pool.filter(e => !usedExercises.has(e.id));
+    if (notCurrent.length >= n) return pickRandom(notCurrent, n);
+    return pickRandom(pool, n);
+  };
+
+  if (isQ) {
+    const quadPool = P.compound_push_squat.filter(e => e.muscles?.some(m => ["quads","glutes","core"].includes(m)));
+    const pushPool = P.compound_push_squat.filter(e => e.muscles?.some(m => ["chest","triceps","shoulders"].includes(m)));
+    [...pickFresh(quadPool, 1), ...pickFresh(pushPool, 1)].forEach(ex => { exercises.push({ ...ex, section: "Strength", sets: levelCfg.compoundSets, reps: levelCfg.compoundReps, rest: levelCfg.restCompound, weight: "—", rpe: levelCfg.compoundRPE, notes: "" }); usedExercises.add(ex.id); });
+    const lungePool = P.accessory_push_squat.filter(e => e.muscles?.some(m => ["quads","glutes"].includes(m)));
+    const shoulderPool = P.accessory_push_squat.filter(e => e.muscles?.some(m => ["shoulders"].includes(m)));
+    const legCurlPool = P.accessory_pull_hinge.filter(e => e.muscles?.some(m => ["hamstrings"].includes(m)));
+    const acc = [...pickFresh(lungePool, 1), ...pickFresh(shoulderPool, 1)];
+    if (durationCfg.accessoryCount >= 3) acc.push(...pickFresh(legCurlPool, 1));
+    if (durationCfg.accessoryCount >= 4) acc.push(...pickFresh(P.accessory_push_squat.filter(e => e.muscles?.some(m => ["triceps","chest","upper chest"].includes(m))), 1));
+    acc.forEach(ex => { exercises.push({ ...ex, section: "Accessories", sets: levelCfg.accessorySets, reps: levelCfg.accessoryReps, rest: levelCfg.restAccessory, weight: "—", rpe: levelCfg.accessoryRPE, notes: "" }); usedExercises.add(ex.id); });
+  } else if (isH) {
+    const hingePool = P.compound_pull_hinge.filter(e => e.muscles?.some(m => ["posterior chain","hamstrings","glutes","inner thigh"].includes(m)));
+    const rowPool = P.compound_pull_hinge.filter(e => e.muscles?.some(m => ["back","biceps"].includes(m)));
+    [...pickFresh(hingePool, 1), ...pickFresh(rowPool, 1)].forEach(ex => { exercises.push({ ...ex, section: "Strength", sets: levelCfg.compoundSets, reps: levelCfg.compoundReps, rest: levelCfg.restCompound, weight: "—", rpe: levelCfg.compoundRPE, notes: "" }); usedExercises.add(ex.id); });
+    if (location === "gym") { const pullUpPool = P.compound_pull_hinge.filter(e => e.name.includes("Pull-Up") || e.name.includes("Chin-Up")); if (pullUpPool.length > 0) { const pu = pickFresh(pullUpPool, 1)[0]; exercises.push({ ...pu, section: "Strength", sets: levelCfg.compoundSets, reps: levelCfg.compoundReps, rest: levelCfg.restCompound, weight: "—", rpe: levelCfg.compoundRPE, notes: "" }); usedExercises.add(pu.id); } }
+    const pullAccPool = P.accessory_pull_hinge.filter(e => e.muscles?.some(m => ["back","rear delts","glutes"].includes(m)));
+    const bicepPool = P.accessory_pull_hinge.filter(e => e.muscles?.some(m => ["biceps","triceps"].includes(m)));
+    const acc = [...pickFresh(pullAccPool, Math.min(durationCfg.accessoryCount, 2))];
+    if (durationCfg.accessoryCount >= 3) acc.push(...pickFresh(bicepPool, 1));
+    acc.forEach(ex => { exercises.push({ ...ex, section: "Accessories", sets: levelCfg.accessorySets, reps: levelCfg.accessoryReps, rest: levelCfg.restAccessory, weight: "—", rpe: levelCfg.accessoryRPE, notes: "" }); usedExercises.add(ex.id); });
+  } else if (isG) {
+    const htPool = P.accessory_pull_hinge.filter(e => e.name.toLowerCase().includes("hip thrust") || e.name.toLowerCase().includes("glute bridge") || e.name.toLowerCase().includes("bridge"));
+    const ht = pickFresh(htPool, 2);
+    if (ht.length >= 1) { exercises.push({ ...ht[0], section: "Strength", sets: levelCfg.compoundSets, reps: levelCfg.compoundReps, rest: levelCfg.restCompound, weight: "—", rpe: levelCfg.compoundRPE, notes: "Heavy" }); usedExercises.add(ht[0].id); }
+    if (ht.length >= 2) { exercises.push({ ...ht[1], section: "Strength", sets: levelCfg.compoundSets, reps: String(parseInt(levelCfg.compoundReps) + 2 || levelCfg.accessoryReps), rest: levelCfg.restCompound, weight: "—", rpe: String(parseInt(levelCfg.compoundRPE) - 1 || levelCfg.accessoryRPE), notes: "Volume" }); usedExercises.add(ht[1].id); }
+    const rdlPool = [...P.accessory_pull_hinge.filter(e => e.name.includes("Single-Leg") || e.name.includes("Good Morning") || e.name.includes("Hamstring")), ...P.accessory_push_squat.filter(e => e.name.includes("Bulgarian") || e.name.includes("Reverse") || e.name.includes("Goblet"))];
+    const gluteIso = P.accessory_pull_hinge.filter(e => e.name.includes("Abductor") || e.name.includes("Kickback") || e.name.includes("Cable Pull") || e.name.includes("Clamshell"));
+    const upperAcc = P.accessory_push_squat.filter(e => e.muscles?.some(m => ["upper chest","chest","triceps","shoulders"].includes(m)));
+    const acc = [...pickFresh(rdlPool, 1), ...pickFresh(gluteIso.length > 0 ? gluteIso : rdlPool, 1)];
+    if (durationCfg.accessoryCount >= 3) acc.push(...pickFresh(upperAcc, 1));
+    if (durationCfg.accessoryCount >= 4) acc.push(...pickFresh(upperAcc.filter(e => !acc.find(a => a.id === e.id)), 1));
+    acc.forEach(ex => { exercises.push({ ...ex, section: "Accessories", sets: levelCfg.accessorySets, reps: levelCfg.accessoryReps, rest: levelCfg.restAccessory, weight: "—", rpe: levelCfg.accessoryRPE, notes: "" }); usedExercises.add(ex.id); });
+  } else if (isFB) {
+    const lowerPool = block % 2 === 0 ? P.compound_push_squat.filter(e => e.muscles?.some(m => ["quads","glutes","core"].includes(m))) : P.compound_pull_hinge.filter(e => e.muscles?.some(m => ["posterior chain","hamstrings","glutes"].includes(m)));
+    const upperPool = block % 2 === 0 ? P.compound_pull_hinge.filter(e => e.muscles?.some(m => ["back","biceps"].includes(m))) : P.compound_push_squat.filter(e => e.muscles?.some(m => ["chest","triceps","shoulders"].includes(m)));
+    [...pickFresh(lowerPool, 1), ...pickFresh(upperPool, 1)].forEach(ex => { exercises.push({ ...ex, section: "Strength", sets: levelCfg.compoundSets, reps: levelCfg.compoundReps, rest: levelCfg.restCompound, weight: "—", rpe: levelCfg.compoundRPE, notes: "" }); usedExercises.add(ex.id); });
+    pickFresh([...P.accessory_push_squat, ...P.accessory_pull_hinge], durationCfg.accessoryCount).forEach(ex => { exercises.push({ ...ex, section: "Accessories", sets: levelCfg.accessorySets, reps: levelCfg.accessoryReps, rest: levelCfg.restAccessory, weight: "—", rpe: levelCfg.accessoryRPE, notes: "" }); usedExercises.add(ex.id); });
+  } else {
+    const compoundPool = isA ? P.compound_push_squat : P.compound_pull_hinge;
+    const upperM = isA ? ["chest","triceps","shoulders","legs"] : ["back","biceps"];
+    const lowerM = isA ? ["quads","glutes","core"] : ["posterior chain","hamstrings","glutes","inner thigh"];
+    [...pickFresh(compoundPool.filter(e => e.muscles?.some(m => lowerM.includes(m))), 1), ...pickFresh(compoundPool.filter(e => e.muscles?.some(m => upperM.includes(m))), 1)].forEach(ex => { exercises.push({ ...ex, section: "Strength", sets: levelCfg.compoundSets, reps: levelCfg.compoundReps, rest: levelCfg.restCompound, weight: "—", rpe: levelCfg.compoundRPE, notes: "" }); usedExercises.add(ex.id); });
+    pickFresh(isA ? P.accessory_push_squat : P.accessory_pull_hinge, durationCfg.accessoryCount).forEach(ex => { exercises.push({ ...ex, section: "Accessories", sets: levelCfg.accessorySets, reps: levelCfg.accessoryReps, rest: levelCfg.restAccessory, weight: "—", rpe: levelCfg.accessoryRPE, notes: "" }); usedExercises.add(ex.id); });
+  }
+
+  pickRandom(P.core, durationCfg.coreCount).forEach(ex => { exercises.push({ ...ex, section: "Core", sets: levelCfg.coreSets, reps: levelCfg.coreReps, rest: 45, weight: "BW", rpe: "", notes: "" }); });
+  const hiitExs = pickRandom(P.hiit, durationCfg.hiitCount);
+  const finFmt = location === "home" ? "AMRAP / Circuit" : "HIIT Circuit";
+  const finReps = location === "home" ? "Circuit — see notes" : "40s on / 20s off";
+  exercises.push({ id: "hiit_" + dayType + "_" + block + "_" + Math.random().toString(36).slice(2,6), name: finFmt, category: "hiit", section: "Finisher", sets: durationCfg.hiitRounds, reps: finReps, rest: 60, weight: "—", rpe: "9", notes: "", circuit: hiitExs.map(e => e.name) });
+  return exercises;
+}
+
+function generateProgram(client, previousProgram = null) {
+  const monthNumber = previousProgram ? (previousProgram.monthNumber || 1) + 1 : (client.monthNumber || 1);
+  const levelCfg = getLevelConfig(client.level, monthNumber);
+  const durationCfg = DURATION_CONFIG[client.sessionDuration || 60];
+  const schedule = buildDaySchedule(client.sessionsPerWeek || 3, client.day3Type || "glute");
+  const dayLabels = { A: "Push + Squat", B: "Pull + Hinge", Q: "Quad + Push", H: "Hinge + Pull", G: "Glute Focus", F: "Full Body" };
+  const loc = client.trainingLocation || "gym";
+  const prevIds = extractPrevIds(previousProgram);
+  const genBlock = (bn) => { const used = new Set(); return schedule.map((dt, i) => ({ dayLabel: "Day " + (i+1), focus: dayLabels[dt], dayType: dt, exercises: generateDay(dt, levelCfg, durationCfg, bn, used, loc, prevIds) })); };
+  const cardioDays = client.cardioDaysPerWeek || 0;
+  return {
+    id: "prog_" + Date.now(), clientId: client.id, clientName: client.name, level: client.level,
+    monthNumber, sessionsPerWeek: client.sessionsPerWeek || 3, sessionDuration: client.sessionDuration || 60, trainingLocation: loc, createdAt: new Date().toISOString(),
+    block1: genBlock(0), block2: genBlock(1), levelCfg, durationCfg,
+    includesRunning: client.includesRunning || cardioDays > 0, cardioDaysPerWeek: cardioDays,
+    cardio: cardioDays > 0 ? { block1: generateCardioDays(client.level, cardioDays, 0), block2: generateCardioDays(client.level, cardioDays, 1) } : null,
+    running: client.includesRunning && cardioDays === 0 ? {
+      block1: [{ day: "Off-Day 1", type: "Easy Run", duration: client.level === "beginner" ? "20 min" : "25 min", notes: "Conversational pace" }, { day: "Off-Day 2", type: client.level === "beginner" ? "Easy Run" : "Tempo Run", duration: client.level === "beginner" ? "20 min" : "30 min", notes: client.level === "beginner" ? "Walk/run intervals OK" : "Moderate effort" }],
+      block2: [{ day: "Off-Day 1", type: "Easy Run", duration: "30 min", notes: "Conversational pace" }, { day: "Off-Day 2", type: client.level === "advanced" ? "Interval Run" : "Tempo Run", duration: "30 min", notes: client.level === "advanced" ? "6×400m w/ 90s rest" : "Progressive pace" }],
+    } : null,
+  };
+}
+
+// ─── ICONS ───
+const I = {
+  dashboard: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>,
+  users: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  program: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>,
+  library: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>,
+  plus: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>,
+  trash: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
+  chevron: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>,
+  back: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>,
+  bolt: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+  check: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+  search: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+  refresh: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>,
+  edit: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+  clock: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  cal: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+  history: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>,
+};
+
+// ─── SAMPLE DATA ───
+const SAMPLE_CLIENTS = [
+  { id: "cl1", name: "Sofia Marchetti", email: "sofia@email.com", phone: "+39 333 1234567", level: "beginner", monthNumber: 1, sessionsPerWeek: 3, sessionDuration: 60, day3Type: "glute", trainingLocation: "gym", cardioDaysPerWeek: 0, goals: "General fitness, weight loss", healthNotes: "None", injuries: [], includesRunning: true, startDate: "2026-01-06", status: "active" },
+  { id: "cl2", name: "Elena Rossi", email: "elena@email.com", phone: "+39 340 9876543", level: "intermediate", monthNumber: 3, sessionsPerWeek: 4, sessionDuration: 75, day3Type: "glute", trainingLocation: "gym", cardioDaysPerWeek: 0, goals: "Strength, muscle tone", healthNotes: "Mild lower back sensitivity", injuries: ["lower back"], includesRunning: false, startDate: "2025-10-15", status: "active" },
+  { id: "cl3", name: "Giulia Bianchi", email: "giulia@email.com", phone: "+39 348 5551234", level: "advanced", monthNumber: 6, sessionsPerWeek: 5, sessionDuration: 90, day3Type: "fullbody", trainingLocation: "gym", cardioDaysPerWeek: 0, goals: "Powerlifting competition prep", healthNotes: "Previous ACL surgery (2023), fully recovered", injuries: [], includesRunning: false, startDate: "2025-08-01", status: "active" },
+  { id: "cl4", name: "Marta Conti", email: "marta@email.com", phone: "+39 345 7778899", level: "beginner", monthNumber: 2, sessionsPerWeek: 2, sessionDuration: 45, day3Type: "glute", trainingLocation: "gym", cardioDaysPerWeek: 0, goals: "Post-pregnancy recovery, core strength", healthNotes: "6 months postpartum, diastasis recti", injuries: [], includesRunning: false, startDate: "2025-12-01", status: "active" },
+  { id: "cl5", name: "Redini", email: "redini@email.com", phone: "", level: "intermediate", monthNumber: 3, sessionsPerWeek: 3, sessionDuration: 75, day3Type: "glute", trainingLocation: "gym", cardioDaysPerWeek: 0, goals: "Strength, pull-up progression, glute development", healthNotes: "None", injuries: [], includesRunning: false, startDate: "2025-09-01", status: "active" },
+  { id: "cl6", name: "Benvenuti", email: "benvenuti@email.com", phone: "", level: "intermediate", monthNumber: 3, sessionsPerWeek: 3, sessionDuration: 60, day3Type: "fullbody", trainingLocation: "home", cardioDaysPerWeek: 3, goals: "General fitness, improve running, body recomposition", healthNotes: "None", injuries: [], includesRunning: false, startDate: "2025-10-01", status: "active" },
+];
+
+const K = { bg: "#0a0a0c", sf: "#131318", sfh: "#1a1a22", cd: "#16161e", bd: "#25252f", tx: "#e8e8ed", tm: "#8b8b9e", td: "#5a5a6e", ac: "#c8ff2e", ab: "rgba(200,255,46,0.08)", ab2: "rgba(200,255,46,0.15)", dg: "#ff4d6a", dgb: "rgba(255,77,106,0.1)", ok: "#2ecc71", wn: "#f0c040", beg: "#5dade2", int: "#f0a030", adv: "#e74c3c" };
+const ff = "'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif";
+const mf = "'JetBrains Mono','SF Mono',monospace";
+
+function Badge({ children, color = K.ac, bg }) { return <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color, background: bg || (color + "18") }}>{children}</span>; }
+function LvlBadge({ level }) { return <Badge color={{ beginner: K.beg, intermediate: K.int, advanced: K.adv }[level] || K.tm}>{level}</Badge>; }
+function Btn({ children, onClick, v = "primary", sm, icon, style: cs, disabled }) {
+  const base = { display: "inline-flex", alignItems: "center", gap: 6, border: "none", borderRadius: 8, fontFamily: ff, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer", transition: "all 0.15s", opacity: disabled ? 0.5 : 1 };
+  const vs = { primary: { background: K.ac, color: "#0a0a0c" }, secondary: { background: K.sfh, color: K.tx, border: "1px solid " + K.bd }, ghost: { background: "transparent", color: K.tm }, danger: { background: K.dgb, color: K.dg } };
+  return <button onClick={onClick} disabled={disabled} style={{ ...base, ...vs[v], padding: sm ? "6px 12px" : "10px 20px", fontSize: sm ? 12 : 13, ...cs }}>{icon}{children}</button>;
+}
+function Inp({ label, value, onChange, type = "text", placeholder, textarea, options, style: cs }) {
+  const s = { width: "100%", padding: "10px 14px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 8, color: K.tx, fontSize: 13, fontFamily: ff, outline: "none", boxSizing: "border-box", ...cs };
+  return (<div style={{ marginBottom: 14 }}>{label && <label style={{ display: "block", marginBottom: 6, fontSize: 12, fontWeight: 600, color: K.tm, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</label>}{options ? <select value={value} onChange={e => onChange(e.target.value)} style={{ ...s, cursor: "pointer" }}>{options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select> : textarea ? <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={{ ...s, resize: "vertical", minHeight: 80 }} /> : <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={s} />}</div>);
+}
+function Crd({ children, style, onClick }) { return <div onClick={onClick} style={{ background: K.cd, border: "1px solid " + K.bd, borderRadius: 12, padding: 20, cursor: onClick ? "pointer" : "default", transition: "all 0.15s", ...style }}>{children}</div>; }
+function Mdl({ title, onClose, children, wide }) {
+  return (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }} onClick={onClose}><div onClick={e => e.stopPropagation()} style={{ background: K.sf, border: "1px solid " + K.bd, borderRadius: 16, padding: 28, width: "100%", maxWidth: wide ? 700 : 500, maxHeight: "85vh", overflowY: "auto" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}><h3 style={{ margin: 0, fontSize: 18, color: K.tx }}>{title}</h3><button onClick={onClose} style={{ background: "none", border: "none", color: K.tm, fontSize: 22, cursor: "pointer" }}>×</button></div>{children}</div></div>);
+}
+function Stat({ label, value, sub, icon }) { return <Crd style={{ flex: 1, minWidth: 140 }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}><div><div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: K.tm, marginBottom: 8 }}>{label}</div><div style={{ fontSize: 28, fontWeight: 700, color: K.tx, fontFamily: mf }}>{value}</div>{sub && <div style={{ fontSize: 12, color: K.td, marginTop: 4 }}>{sub}</div>}</div><div style={{ color: K.ac, opacity: 0.6 }}>{icon}</div></div></Crd>; }
+
+// ─── HISTORY HELPERS ───
+function getLatest(prgs, cId) { const a = prgs[cId]; return a && a.length > 0 ? a[a.length - 1] : null; }
+function getAll(prgs, cId) { return prgs[cId] || []; }
+function addProg(prgs, cId, p) { const a = prgs[cId] ? [...prgs[cId]] : []; a.push(p); return { ...prgs, [cId]: a }; }
+function updProg(prgs, cId, p) { return { ...prgs, [cId]: (prgs[cId] || []).map(x => x.id === p.id ? p : x) }; }
+
+// ─── PDF HISTORICAL PROGRAMS ───
+const ex = (id, name, section, sets, reps, rest, weight, rpe, notes) => ({ id, name, category: section === "Warm-Up" ? "mobility" : section === "Core" ? "core" : section === "Finisher" ? "hiit" : "compound", section, sets, reps, rest: parseInt(rest) || 0, weight: weight || "—", rpe: rpe || "", notes: notes || "" });
+
+const REDINI_B1 = {
+  id: "prog_r1", clientId: "cl5", clientName: "Redini", level: "intermediate", monthNumber: 1, sessionsPerWeek: 3, sessionDuration: 75, trainingLocation: "gym", createdAt: "2025-09-01T10:00:00Z",
+  block1: [
+    { dayLabel: "Day 1", focus: "Leg Press + Spinte", dayType: "Q", exercises: [
+      ex("cps9","Leg Press 45°","Strength",4,"10","120","90–110kg","",""),
+      ex("cps3","Bench Press","Strength",3,"6","90","20–22.5kg","","lavora su tecnica"),
+      ex("aps8","Reverse Lunge","Accessories",3,"10/10","90","2×16kg","","deve essere molto pesante"),
+      ex("aph7","Leg Curl","Accessories",3,"12","75","25-27.5kg","",""),
+      ex("aps13","Arnold Press","Accessories",3,"10","90","6–8kg","",""),
+    ]},
+    { dayLabel: "Day 2", focus: "Deadlift + Tirate + Pull-Up", dayType: "H", exercises: [
+      ex("cph1","Deadlift","Strength",4,"5","120","50–55kg","",""),
+      ex("cph3","Barbell Row","Strength",4,"8","120","25-30kg","","tirala di brutto no matter what"),
+      ex("aph8","Lat Machine (Neutral)","Accessories",3,"6 - ecc 2s","120","40kg","",""),
+      ex("cph4","Pull-Up (Banded)","Strength",3,"3","120","banded","",""),
+      ex("aph1","Hip Thrust","Accessories",3,"10","120","65–70kg","","sfondati il culo La"),
+    ]},
+    { dayLabel: "Day 3", focus: "Glute Focus + Accessori", dayType: "G", exercises: [
+      ex("aph1","Hip Thrust","Strength",4,"8","120","70-75kg","",""),
+      ex("aps1","Bulgarian Split Squat","Accessories",3,"8/8","120","2×16kg","",""),
+      ex("aph15","Abductor Machine","Accessories",3,"20","45","35–45kg","",""),
+      ex("aps17","Dumbbell Incline Press 90°","Accessories",3,"10","120","2×8kg","",""),
+      ex("aps16","Cable Triceps","Accessories",3,"12","75","10–12kg","",""),
+      ex("co8","Hollow Hold + V-up","Core",3,"25\" each","60","BW","",""),
+    ]},
+  ],
+  block2: [
+    { dayLabel: "Day 1", focus: "Leg Press + Spinte", dayType: "Q", exercises: [
+      ex("cps9","Leg Press 45°","Strength",4,"8","120","90–110kg","",""),
+      ex("cps3","Bench Press","Strength",4,"6","90","20–22.5kg","",""),
+      ex("aps8","Reverse Lunge","Accessories",3,"12/12","90","2×16kg","",""),
+      ex("aph7","Leg Curl","Accessories",3,"12","75","25-27.5kg","",""),
+      ex("aps13","Arnold Press","Accessories",4,"10","90","6–8kg","",""),
+    ]},
+    { dayLabel: "Day 2", focus: "Deadlift + Tirate + Pull-Up", dayType: "H", exercises: [
+      ex("cph1","Deadlift","Strength",4,"5","120","50–55kg","",""),
+      ex("cph3","Barbell Row","Strength",4,"8","120","25-30kg","",""),
+      ex("aph8","Lat Machine (Neutral)","Accessories",3,"7","120","40kg","",""),
+      ex("cph4","Pull-Up (Banded)","Strength",4,"3","120","banded","",""),
+      ex("aph1","Hip Thrust","Accessories",4,"10","120","65–70kg","",""),
+    ]},
+    { dayLabel: "Day 3", focus: "Glute Focus + Accessori", dayType: "G", exercises: [
+      ex("aph1","Hip Thrust","Strength",4,"8","120","70-75kg","",""),
+      ex("aps1","Bulgarian Split Squat","Accessories",3,"8/8","120","2×16kg","",""),
+      ex("aph15","Abductor Machine","Accessories",3,"20","45","35–45kg","",""),
+      ex("aps17","Dumbbell Incline Press 90°","Accessories",4,"5+5 rec 15s","120","2×8kg W3-4 9kg","","piangi"),
+      ex("aps16","Cable Triceps","Accessories",3,"12","75","10–12kg","",""),
+      ex("co8","Hollow Hold + V-up","Core",3,"30\" each","60","BW","",""),
+    ]},
+  ],
+  includesRunning: false, cardioDaysPerWeek: 0, cardio: null, running: null,
+  levelCfg: LEVEL_CONFIG.intermediate.month1, durationCfg: DURATION_CONFIG[75],
+};
+
+const REDINI_B2 = {
+  id: "prog_r2", clientId: "cl5", clientName: "Redini", level: "intermediate", monthNumber: 2, sessionsPerWeek: 3, sessionDuration: 75, trainingLocation: "gym", createdAt: "2025-10-01T10:00:00Z",
+  block1: [
+    { dayLabel: "Day 1", focus: "Leg Press + Spinte (Intensità)", dayType: "Q", exercises: [
+      ex("cps9","Leg Press 45°","Strength",4,"10","120","110kg","",""),
+      ex("cps3","Bench Press","Strength",3,"8","90","20-25kg","",""),
+      ex("aps2","Walking Lunge","Accessories",3,"10/10","90","2×14kg","",""),
+      ex("aps21","Shoulder Press DB","Accessories",3,"8","120","10kg","",""),
+      ex("aph7","Leg Curl","Accessories",3,"10+5 rec 10s","90","27.5kg","",""),
+    ]},
+    { dayLabel: "Day 2", focus: "Deadlift + Tirate + Pull-Up Adv.", dayType: "H", exercises: [
+      ex("cph1","Deadlift","Strength","2","5-4-3 (↑kg)","150","50-52.5-55kg","","W5-6"),
+      ex("cph3","Barbell Row","Strength",3,"10","90","30kg","",""),
+      ex("cph4","Pull-Up (Assisted)","Strength",3,"5","120","assist","",""),
+      ex("aph8","Lat Machine","Accessories",2,"8","120","40kg","",""),
+      ex("aph1","Hip Thrust","Accessories",3,"10","120","67.5–72.5kg","","ihih"),
+    ]},
+    { dayLabel: "Day 3", focus: "Glute Max + Medius", dayType: "G", exercises: [
+      ex("aph1","Hip Thrust","Strength",5,"5","120","80-75kg","",""),
+      ex("cph9","RDL Manubri","Accessories",4,"10","120","2×16–20kg","",""),
+      ex("aph16","Cable Kickback","Accessories",3,"12","75","10kg","",""),
+      ex("aps17","Dumbbell Incline Press 90°","Accessories",4,"8","120","2×9-10kg","",""),
+      ex("co15","Plank Reach + V-up","Core",3,"10/10 each","60","BW","",""),
+    ]},
+  ],
+  block2: [
+    { dayLabel: "Day 1", focus: "Leg Press + Spinte (Intensità)", dayType: "Q", exercises: [
+      ex("cps9","Leg Press 45°","Strength",4,"10 ecc 3s","120","110kg","",""),
+      ex("cps3","Bench Press","Strength",4,"5","90","20-25kg","",""),
+      ex("aps2","Walking Lunge","Accessories",3,"12/12","90","2×14kg","",""),
+      ex("aps21","Shoulder Press DB","Accessories",3,"8","120","10kg","",""),
+      ex("aph7","Leg Curl","Accessories",3,"10+8 rec 10s","90","27.5kg","",""),
+    ]},
+    { dayLabel: "Day 2", focus: "Deadlift + Tirate + Pull-Up Adv.", dayType: "H", exercises: [
+      ex("cph1","Deadlift","Strength",4,"4","150","55kg","","W6-7"),
+      ex("cph3","Barbell Row","Strength",4,"10","90","30kg","",""),
+      ex("cph4","Pull-Up","Strength",5,"2","120","banda leggera","",""),
+      ex("aph8","Lat Machine","Accessories",2,"8 ecc 3s","120","40kg","",""),
+      ex("aph1","Hip Thrust","Accessories",4,"10","120","67.5–72.5kg","","ihih"),
+    ]},
+    { dayLabel: "Day 3", focus: "Glute Max + Medius", dayType: "G", exercises: [
+      ex("aph1","Hip Thrust","Strength",5,"8","120","80-75kg","",""),
+      ex("cph9","RDL Manubri","Accessories",4,"10","120","2×16–20kg","",""),
+      ex("aph16","Cable Kickback","Accessories",3,"12","75","10kg","",""),
+      ex("aps17","Dumbbell Incline Press 90°","Accessories",4,"10","120","2×9-10kg","",""),
+      ex("co15","Plank Reach + V-up","Core",3,"10/10 each","60","BW","",""),
+    ]},
+  ],
+  includesRunning: false, cardioDaysPerWeek: 0, cardio: null, running: null,
+  levelCfg: LEVEL_CONFIG.intermediate.following, durationCfg: DURATION_CONFIG[75],
+};
+
+const REDINI_B3 = {
+  id: "prog_r3", clientId: "cl5", clientName: "Redini", level: "intermediate", monthNumber: 3, sessionsPerWeek: 3, sessionDuration: 75, trainingLocation: "gym", createdAt: "2025-11-01T10:00:00Z",
+  block1: [
+    { dayLabel: "Day 1", focus: "Leg Press + Spinte (Intensità)", dayType: "Q", exercises: [
+      ex("cps9","Leg Press 45°","Strength",3,"8","120","120kg","","tienimi aggiornata su sensazione peso"),
+      ex("cps3","Bench Press","Strength",3,"6","90","25kg","",""),
+      ex("aps1","Bulgarian Split Squat","Accessories",3,"8/side","90","2×12kg","","ihih"),
+      ex("aps21","Shoulder Press DB","Accessories",4,"8","120","10kg","","oh spingi"),
+      ex("aps3","Lateral Raises + Knee Raises","Accessories",3,"12+8","75","2×6kg","",""),
+    ]},
+    { dayLabel: "Day 2", focus: "Deadlift + Tirate + Pull-Up Adv.", dayType: "H", exercises: [
+      ex("cph1","Deadlift","Strength",4,"4 (3s ecc + 3s conc)","150","52.5kg","","W9-10"),
+      ex("cph4","Pull-Up","Strength",3,"3","120","—","","fammi sap come vanno"),
+      ex("aph8","Lat Machine","Accessories",2,"10","120","40kg","",""),
+      ex("cph3","Barbell Row","Strength",3,"10","90","35kg","",""),
+      ex("aph1","Hip Thrust","Accessories",3,"8","120","75kg","","ihih"),
+    ]},
+    { dayLabel: "Day 3", focus: "Glute Max + Medius", dayType: "G", exercises: [
+      ex("aph1","Hip Thrust","Strength",3,"10","90","70kg","",""),
+      ex("cph9","RDL Manubri","Accessories",4,"10","120","2×16–20kg","",""),
+      ex("aph7","Leg Curls","Accessories",3,"12","75","10kg","",""),
+      ex("aps17","Dumbbell Incline Press 90°","Accessories",4,"8","120","2×9-10kg","",""),
+      ex("co8","Hollow Hold + V-up","Core",3,"30s each","60","BW","",""),
+    ]},
+  ],
+  block2: [
+    { dayLabel: "Day 1", focus: "Leg Press + Spinte (Intensità)", dayType: "Q", exercises: [
+      ex("cps9","Leg Press 45°","Strength",4,"8","120","120kg","",""),
+      ex("cps3","Bench Press","Strength",4,"6","90","25kg","",""),
+      ex("aps1","Bulgarian Split Squat","Accessories",3,"10/side","90","2×12kg","",""),
+      ex("aps21","Shoulder Press DB","Accessories",4,"6+6 rec 15s","120","10kg","",""),
+      ex("aps3","Lateral Raises + Knee Raises","Accessories",4,"12+10","75","2×6kg","",""),
+    ]},
+    { dayLabel: "Day 2", focus: "Deadlift + Tirate + Pull-Up Adv.", dayType: "H", exercises: [
+      ex("cph1","Deadlift","Strength",4,"6","150","55kg","","W11-12"),
+      ex("cph4","Pull-Up","Strength",4,"3","120","—","",""),
+      ex("aph8","Lat Machine","Accessories",2,"10","120","40kg","",""),
+      ex("cph3","Barbell Row","Strength",4,"10","90","35kg","",""),
+      ex("aph1","Hip Thrust","Accessories",4,"8","120","75kg","","ihih"),
+    ]},
+    { dayLabel: "Day 3", focus: "Glute Max + Medius", dayType: "G", exercises: [
+      ex("aph1","Hip Thrust","Strength",4,"10","90","70kg","",""),
+      ex("cph9","RDL Manubri","Accessories",4,"10","120","2×16–20kg","",""),
+      ex("aph7","Leg Curls","Accessories",3,"12","75","10kg","",""),
+      ex("aps17","Dumbbell Incline Press 90°","Accessories",4,"10","120","2×9-10kg","",""),
+      ex("co8","Hollow Hold + V-up","Core",4,"30s each","60","BW","",""),
+    ]},
+  ],
+  includesRunning: false, cardioDaysPerWeek: 0, cardio: null, running: null,
+  levelCfg: LEVEL_CONFIG.intermediate.following, durationCfg: DURATION_CONFIG[75],
+};
+
+const mkCardio = (label, type, warmup, work, cooldown, rpe) => ({ dayLabel: label, type, warmup, work, cooldown, rpe });
+
+const BENVENUTI_B1 = {
+  id: "prog_b1", clientId: "cl6", clientName: "Benvenuti", level: "intermediate", monthNumber: 1, sessionsPerWeek: 3, sessionDuration: 60, trainingLocation: "home", createdAt: "2025-10-01T10:00:00Z",
+  block1: [
+    { dayLabel: "Day 1", focus: "Home Gym (Lower Focus)", dayType: "A", exercises: [
+      ex("cps5","Goblet Squat (SS w/ 1-Arm Row)","Strength",3,"10+12","90","12kg / RIR 2","","Ecc squat 3s"),
+      ex("cps10","DB Floor Press","Strength",3,"10","90","2×8kg","2",""),
+      ex("cph9","Romanian Deadlift","Accessories",3,"12","90","2×10kg","2","Inizia minimo"),
+      ex("aph22","DB Hip Thrust","Accessories",3,"12","60","20kg + elastico","1","Pausa 2s top glutei"),
+      ex("co15","Plank Reach + V-up","Core",3,"12+10","45","BW","",""),
+    ]},
+    { dayLabel: "Day 2", focus: "Home Gym (Upper Focus)", dayType: "B", exercises: [
+      ex("aps19","Push-Up Negative (Ecc 3s)","Strength",3,"5","90","BW","1","senza ginocchia"),
+      ex("aps20","Half Kneeling Press","Accessories",3,"10","90","1×7kg","2",""),
+      ex("aph19","Hamstring Bridge + Wallsit","Accessories",3,"10 + 30s","60","8kg","",""),
+      ex("aps3","Lateral Raise + Bicep Curl","Accessories",3,"10+12","75","2×5kg","2-3",""),
+      ex("aps24","Dip su Sedia","Accessories",3,"12","60","BW","",""),
+      ex("h15","AMRAP 5': Up&Down + Rev Crunch + Push Press","Finisher",1,"6+8+10","0","2×7kg","","As many rounds as possible baby"),
+    ]},
+  ],
+  block2: [
+    { dayLabel: "Day 1", focus: "Home Gym (Lower Focus)", dayType: "A", exercises: [
+      ex("cps5","Goblet Squat (SS w/ 1-Arm Row)","Strength",4,"10+12 → 4×8+10","90","12-14kg / RIR 2","","Ecc squat 3s"),
+      ex("cps10","DB Floor Press","Strength",4,"10 → 4×8","90","2×8kg → ↑kg","2","W4: aumenta kg"),
+      ex("cph9","Romanian Deadlift","Accessories",3,"10 → 4×10","90","2×12kg","2",""),
+      ex("aph22","DB Hip Thrust","Accessories",4,"12 → 4×15","60","20kg + elastico","1","Pausa 2s top"),
+      ex("co15","Plank Reach + V-up","Core",3,"14+12","45","BW","","W4: 4 round"),
+    ]},
+    { dayLabel: "Day 2", focus: "Home Gym (Upper Focus)", dayType: "B", exercises: [
+      ex("aps19","Push-Up Negative (Ecc 3s)","Strength",4,"5","90","BW","1",""),
+      ex("aps20","Half Kneeling Press","Accessories",4,"10 ecc 3s → 4×12","90","1×7kg","2",""),
+      ex("aph20","SL Hamstring Bridge + Wallsit","Accessories",4,"10+30s → 4×12+40s","60","10kg","",""),
+      ex("aps3","Lateral Raise + Bicep Curl","Accessories",4,"10+12 → 4×12+12","75","2×5kg","2-3",""),
+      ex("aps24","Dip su Sedia","Accessories",3,"15","75","BW","",""),
+      ex("h1","AMRAP 5-6': Burpees + Squat Jumps + Push Press","Finisher",1,"5+10+10","0","2×7kg","",""),
+    ]},
+  ],
+  includesRunning: false, cardioDaysPerWeek: 3,
+  cardio: {
+    block1: [
+      mkCardio("Cardio 1","Easy Run (Progressive)","5' easy run + mobilità","5km progressivi: 1lento + 2medio + 2sostenuto","5' jogging + stretching","7"),
+      mkCardio("Cardio 2","Interval Run (Ripetute)","5' easy run + mobilità","10×500m, 1'30\" camminata, ritmo sostenuto","5' jogging + stretching","8-9"),
+    ],
+    block2: [
+      mkCardio("Cardio 1","Easy Run (Progressive)","5' + mobilità","6km progressivi: 1lento + 3medio + 2sostenuto","5' jogging + stretching","7-8"),
+      mkCardio("Cardio 2","Interval Run (Ripetute)","5' easy run + mobilità","12×500m, 1'30\" camminata, ritmo sostenuto","5' jogging + stretching","8-9"),
+    ],
+  },
+  running: null, levelCfg: LEVEL_CONFIG.intermediate.month1, durationCfg: DURATION_CONFIG[60],
+};
+
+const BENVENUTI_B2 = {
+  id: "prog_b2", clientId: "cl6", clientName: "Benvenuti", level: "intermediate", monthNumber: 2, sessionsPerWeek: 3, sessionDuration: 60, trainingLocation: "home", createdAt: "2025-11-01T10:00:00Z",
+  block1: [
+    { dayLabel: "Day 1", focus: "Home Gym (Lower)", dayType: "A", exercises: [
+      ex("cps5","Goblet Squat (SS w/ Side Plank Clamshell)","Strength",3,"8+12/side","60","1×16kg","3",""),
+      ex("aps18","Goblet Split Squat","Accessories",3,"10/gamba","90","12kg","2",""),
+      ex("cps10","DB Floor Press","Strength",3,"10","90","2×10kg","2",""),
+      ex("aps19","Push-Up Negative","Accessories",5,"5","75","BW","1","No ginocchia"),
+      ex("co14","Plank Drag Through + Plank Commando","Core",3,"10+10","60","1×10kg","","Alternati"),
+    ]},
+    { dayLabel: "Day 2", focus: "Home Gym (Hinge/Upper)", dayType: "B", exercises: [
+      ex("cph9","Romanian Deadlift","Strength",3,"12","90","2×14kg","2","Ecc 3s"),
+      ex("aph18","DB SL Hip Thrust","Accessories",3,"12/gamba","60","14kg","1","Pausa 2s top"),
+      ex("aps21","Seated Press (Chair)","Accessories",3,"8","90","2×8kg","2",""),
+      ex("aph20","SL Hamstring Bridge + Lateral Raise","Accessories",4,"15+30s","60","2×5kg","",""),
+      ex("co1","Core: Plank Accumulo","Core",1,"4' plank","0","BW","",""),
+    ]},
+    { dayLabel: "Day 3", focus: "Home Gym (Pull/Legs)", dayType: "F", exercises: [
+      ex("h16","Circuito Attivazione: Wormwalk + Up&Down + Squat Jump","Warm-Up",3,"4+6+8","0","BW","","paxxerella"),
+      ex("cph10","1-Arm Row","Strength",3,"12","90","14kg","1","Pausa 2s top"),
+      ex("aps25","SL Goblet Squat (Chair)","Accessories",3,"10/gamba","90","1×10kg","2",""),
+      ex("aps24","Dip Sedia + Bicep Curls (SS)","Accessories",3,"15+10","60","2×6kg","1-2",""),
+      ex("h1","Circuito: 2-4-6-8… Burpees + V-up","Finisher",1,"ladder","0","BW","","Cap Time 5'"),
+    ]},
+  ],
+  block2: [
+    { dayLabel: "Day 1", focus: "Home Gym (Lower)", dayType: "A", exercises: [
+      ex("cps5","Goblet Squat (SS w/ Side Plank Clamshell)","Strength",3,"10+12/side → 3×12+12/side","60","1×16kg","3",""),
+      ex("aps18","Goblet Split Squat","Accessories",4,"10/gamba → 4×12/gamba","90","12kg","2",""),
+      ex("cps10","DB Floor Press","Strength",4,"8","90","2×12kg","2",""),
+      ex("aps22","Push-Up (ROM ridotto)","Accessories",4,"5 → 4×6","75","BW","1","Cuscino sotto petto"),
+      ex("co14","Plank Drag Through + Plank Commando","Core",3,"12+12","60","1×10kg","","Alternati"),
+    ]},
+    { dayLabel: "Day 2", focus: "Home Gym (Hinge/Upper)", dayType: "B", exercises: [
+      ex("cph9","Romanian Deadlift","Strength","4→3","15 → 3×12","90","2×14kg → 2×16kg","2",""),
+      ex("aph18","DB SL Hip Thrust","Accessories",3,"15/gamba → 4×15","60","14-16kg","1","Pausa 2s top"),
+      ex("aps21","Seated Press (Chair)","Accessories",3,"10 → 4×10","90","2×8kg","2",""),
+      ex("aph21","Hamstring Sliding Curls + Lateral Raise","Accessories",4,"10+8","60","2×6kg","",""),
+      ex("co1","Core: Plank Accumulo","Core",1,"6' plank → 6' high plank","0","BW","",""),
+    ]},
+    { dayLabel: "Day 3", focus: "Home Gym (Pull/Legs)", dayType: "F", exercises: [
+      ex("h16","Circuito Attivazione: Wormwalk + Up&Down + Squat Jump","Warm-Up",3,"4+6+8","0","BW","","paxxerella"),
+      ex("cph10","1-Arm Row","Strength",4,"12 → 4×8 ↑kg","90","14-16kg","1",""),
+      ex("aps25","SL Goblet Squat (Chair)","Accessories",3,"10/gamba → 3×12/gamba","90","1×12kg","2",""),
+      ex("aps24","Dip Sedia + Bicep Curls (SS)","Accessories",3,"15+12 → 4×15+12","60","2×6kg","1-2",""),
+      ex("h8","Circuito: 3-6-9… Thruster + Deadlift","Finisher",1,"ladder","0","2×8kg","","Cap Time 5'"),
+    ]},
+  ],
+  includesRunning: false, cardioDaysPerWeek: 3,
+  cardio: {
+    block1: [
+      mkCardio("Cardio 1","Interval Run (800m)","5' easy run + mobilità","6×800m, rec 2' ferma, spingi RPE 8-9","5' jogging + stretching","8-9"),
+      mkCardio("Cardio 2","Fartlek","5' easy run + mobilità","2' sostenuti + 2' lenti × 28'","5' jogging + stretching","7-8"),
+      mkCardio("Cardio 3","Z2 Easy Run","5'","7k easy peasy — conversational pace","5'","5"),
+    ],
+    block2: [
+      mkCardio("Cardio 1","Interval Run (600m)","5' easy run + mobilità","8×600m, rec 2' ferma, più veloce degli 800m RPE 8-9","5' jogging + stretching","8-9"),
+      mkCardio("Cardio 2","Fartlek","5' easy run + mobilità","2' sostenuti + 1' veloce + 2' lenti × 30'","5' jogging + stretching","7-8"),
+      mkCardio("Cardio 3","Z2 Easy Run","5'","8k easy","5' jogging + stretching","5"),
+    ],
+  },
+  running: null, levelCfg: LEVEL_CONFIG.intermediate.following, durationCfg: DURATION_CONFIG[60],
+};
+
+const BENVENUTI_B3 = {
+  id: "prog_b3", clientId: "cl6", clientName: "Benvenuti", level: "intermediate", monthNumber: 3, sessionsPerWeek: 3, sessionDuration: 60, trainingLocation: "home", createdAt: "2025-12-01T10:00:00Z",
+  block1: [
+    { dayLabel: "Day 1", focus: "Home Gym (Lower)", dayType: "A", exercises: [
+      ex("cps5","Circuito: Goblet Squat + Plank Reach + Dead Bug","Warm-Up",3,"30s each","60","1×16kg","",""),
+      ex("aps8","Reverse Lunges","Strength",4,"8/gamba","120","2×8kg","2",""),
+      ex("aps23","DB Bridged Floor Press","Accessories",4,"8","90","2×12kg","2","su il culooo"),
+      ex("aps22","Push-Up Hand Release","Accessories",3,"8","90","BW","1","No ginocchia — mani si staccano"),
+      ex("aps24","Dip Sedia + Plank Row (SS)","Accessories",3,"12 ecc 3s + 10/side","60","1×10kg","",""),
+    ]},
+    { dayLabel: "Day 2", focus: "Home Gym (Hinge/Upper)", dayType: "B", exercises: [
+      ex("aph17","RDL B-Stance DB","Strength",3,"10/gamba","90","2×10kg","2","Ecc 3s"),
+      ex("aph22","Hip Thrust + Band","Accessories",3,"15","60","2×10kg","1","Pausa 2s top"),
+      ex("aps21","Seated Press (Chair)","Accessories",4,"10","120","2×8kg","2",""),
+      ex("aph25","EMOM 8': Bicep Curls + Tricep Ext","Finisher",1,"8+12","0","2×6kg","",""),
+      ex("co1","Core: Plank Accumulo","Core",1,"6' plank","0","BW","",""),
+    ]},
+    { dayLabel: "Day 3", focus: "Home Gym (Pull/Legs)", dayType: "F", exercises: [
+      ex("h15","Circuito Attivazione: Plank Commando + Up&Down + Air Squat","Warm-Up",3,"4+8+12","0","BW","","paxxerella"),
+      ex("cph10","1-Arm Row","Strength",4,"8","90","16kg","1","Pausa 2s top"),
+      ex("aps25","SL Goblet Squat (Chair)","Accessories",4,"10/gamba","90","1×12kg","2",""),
+      ex("aps3","Lateral Raises + Frontal Raises (SS)","Accessories",3,"12+10","60","2×6kg","1-2",""),
+      ex("h1","3RFT: Rev Lunges + Burpees + Squat Jumps","Finisher",3,"12+6+12","0","2×6kg per affondi","","Circuito della muerte"),
+    ]},
+  ],
+  block2: [
+    { dayLabel: "Day 1", focus: "Home Gym (Lower)", dayType: "A", exercises: [
+      ex("cps5","Circuito: Goblet Squat + Plank Reach + Dead Bug","Warm-Up",3,"40-45s each","60","1×16kg","",""),
+      ex("aps8","Reverse Lunges","Strength",4,"10/gamba","120","2×8kg","2",""),
+      ex("aps23","DB Bridged Floor Press + Handstand Walk","Accessories",4,"8+3 → 4×10+4","90","2×12kg","2","se non riesci hw, facciamo su sedia"),
+      ex("aps22","Push-Up Hand (ROM ridotto)","Accessories",3,"8","90","BW","1","No ginocchia — libro sottile"),
+      ex("aps24","Dip Sedia gambe tese + Plank Row (SS)","Accessories",4,"10+12/side","60","1×10kg","",""),
+    ]},
+    { dayLabel: "Day 2", focus: "Home Gym (Hinge/Upper)", dayType: "B", exercises: [
+      ex("aph17","RDL B-Stance DB","Strength",3,"15 → 3×12","90","2×10kg → 2×12kg","2",""),
+      ex("aph22","Hip Thrust + Band","Accessories",4,"15","60","2×12kg","1","Pausa 2s top"),
+      ex("aps21","Seated Press (Chair)","Accessories",4,"10 ecc 3s","120","2×8kg","2",""),
+      ex("aph25","EMOM 8': Bicep Curls + Tricep Ext","Finisher",1,"6+10","0","2×8kg","",""),
+      ex("co1","Core: Plank Accumulo","Core",1,"7' plank","0","BW","",""),
+    ]},
+    { dayLabel: "Day 3", focus: "Home Gym (Pull/Legs)", dayType: "F", exercises: [
+      ex("h15","Circuito Attivazione: Plank Commando + Up&Down + Squat Jump","Warm-Up",3,"6+6+6","0","BW","","paxxerella"),
+      ex("cph10","1-Arm Row","Strength",3,"10 → 3×12","90","16kg","1",""),
+      ex("aps25","SL Goblet Squat (ripiano più basso)","Accessories",4,"10/gamba → 4×12","90","1×12kg","2","Su divano?"),
+      ex("aps3","Lateral Raises + Frontal Raises (SS)","Accessories",3,"15+12","60","2×6kg","1-2",""),
+      ex("h10","30s on/15s off × 3: Mt Climbers + Split Jumps + Plank Commando + Burpees","Finisher",3,"30s on/15s off","0","BW","","Circuito della muerte"),
+    ]},
+  ],
+  includesRunning: false, cardioDaysPerWeek: 3,
+  cardio: {
+    block1: [
+      mkCardio("Cardio 1","Fartlek (Easy)","5' - tanta mobilità","1' moderato + 1' easy × 20' RPE 6-7","5' - stretching","6-7"),
+      mkCardio("Cardio 2","Progressive 800m","5' - tanta mobilità","4×800m easy + 200m rest camminando","5' - stretching","6-7"),
+      mkCardio("Cardio 3","Z2 Bike","—","45' eaasy — non ripartiamo abbomba con la corsa","—","5"),
+    ],
+    block2: [
+      mkCardio("Cardio 1","Fartlek (Build)","5' camminata + mobilità","1' moderato + 1' easy × 24'","5' - stretching","6-7"),
+      mkCardio("Cardio 2","Progressive Run","5' easy run + mobilità","20' progressivi — parti piano e aumenta","5' jogging + stretching","7-8"),
+      mkCardio("Cardio 3","Z2 Bike","—","45' eaasy — conversational pace","—","5"),
+    ],
+  },
+  running: null, levelCfg: LEVEL_CONFIG.intermediate.following, durationCfg: DURATION_CONFIG[60],
+};
+
+const INITIAL_PRGS = {
+  cl5: [REDINI_B1, REDINI_B2, REDINI_B3],
+  cl6: [BENVENUTI_B1, BENVENUTI_B2, BENVENUTI_B3],
+};
+
+// ─── SUPABASE ───
+const SUPA_URL = "https://wvbyrqevjuukkwjwzicj.supabase.co";
+const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind2YnlycWV2anV1a2t3and6aWNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzNzg3NjQsImV4cCI6MjA4NTk1NDc2NH0.FAOa7BFMOTftWVPlBJzWx5lJRhnaR-Yl8ktYrHcf2CY";
+const supaFetch = (path, { method = "GET", body, prefer } = {}) =>
+  fetch(`${SUPA_URL}/rest/v1/${path}`, { method, headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}`, "Content-Type": "application/json", ...(prefer ? { Prefer: prefer } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) })
+  .then(r => r.ok ? (r.status === 204 ? [] : r.json()) : r.text().then(t => { console.error("Supa:", t); return []; }));
+
+const clToDb = c => ({ id: c.id, name: c.name, email: c.email || "", phone: c.phone || "", level: c.level, month_number: c.monthNumber || 1, sessions_per_week: c.sessionsPerWeek || 3, session_duration: c.sessionDuration || 60, day3_type: c.day3Type || "glute", training_location: c.trainingLocation || "gym", cardio_days_per_week: c.cardioDaysPerWeek || 0, goals: c.goals || "", health_notes: c.healthNotes || "", injuries: c.injuries || [], includes_running: c.includesRunning || false, start_date: c.startDate || "", status: c.status || "active" });
+const clFromDb = r => ({ id: r.id, name: r.name, email: r.email, phone: r.phone, level: r.level, monthNumber: r.month_number, sessionsPerWeek: r.sessions_per_week, sessionDuration: r.session_duration, day3Type: r.day3_type, trainingLocation: r.training_location, cardioDaysPerWeek: r.cardio_days_per_week, goals: r.goals, healthNotes: r.health_notes, injuries: r.injuries, includesRunning: r.includes_running, startDate: r.start_date, status: r.status });
+const prToDb = p => ({ id: p.id, client_id: p.clientId, client_name: p.clientName, level: p.level, month_number: p.monthNumber, sessions_per_week: p.sessionsPerWeek || 3, session_duration: p.sessionDuration || 60, training_location: p.trainingLocation || "gym", includes_running: p.includesRunning || false, cardio_days_per_week: p.cardioDaysPerWeek || 0, block1: p.block1, block2: p.block2, cardio: p.cardio || null, running: p.running || null, level_cfg: p.levelCfg || null, duration_cfg: p.durationCfg || null, created_at: p.createdAt });
+const prFromDb = r => ({ id: r.id, clientId: r.client_id, clientName: r.client_name, level: r.level, monthNumber: r.month_number, sessionsPerWeek: r.sessions_per_week, sessionDuration: r.session_duration, trainingLocation: r.training_location, includesRunning: r.includes_running, cardioDaysPerWeek: r.cardio_days_per_week, block1: r.block1, block2: r.block2, cardio: r.cardio, running: r.running, levelCfg: r.level_cfg, durationCfg: r.duration_cfg, createdAt: r.created_at });
+const dbLoad = table => supaFetch(`${table}?select=*&order=${table === "clients" ? "name" : "created_at"}`);
+const dbSave = (table, data) => supaFetch(table, { method: "POST", body: data, prefer: "return=representation,resolution=merge-duplicates" });
+const dbDelete = (table, id) => supaFetch(`${table}?id=eq.${id}`, { method: "DELETE" });
+
+// ─── MAIN ───
+export default function App() {
+  const [pg, setPg] = useState("dashboard");
+  const [cls, setCls] = useState([]);
+  const [prgs, setPrgs] = useState({});
+  const [selCl, setSelCl] = useState(null);
+  const [selPr, setSelPr] = useState(null);
+  const [showCM, setShowCM] = useState(false);
+  const [editCl, setEditCl] = useState(null);
+  const [sq, setSq] = useState("");
+  const [ntf, setNtf] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const notify = (m, t = "success") => { setNtf({ m, t }); setTimeout(() => setNtf(null), 3000); };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        let clients = await dbLoad("clients");
+        let programs = await dbLoad("programs");
+        // Seed if DB is empty
+        if (!Array.isArray(clients) || clients.length === 0) {
+          await dbSave("clients", SAMPLE_CLIENTS.map(clToDb));
+          clients = SAMPLE_CLIENTS;
+        } else {
+          clients = clients.map(clFromDb);
+        }
+        if (!Array.isArray(programs) || programs.length === 0) {
+          const allProgs = Object.values(INITIAL_PRGS).flat();
+          await dbSave("programs", allProgs.map(prToDb));
+          programs = allProgs;
+        } else {
+          programs = programs.map(prFromDb);
+        }
+        setCls(clients);
+        const grouped = {};
+        programs.forEach(p => { if (!grouped[p.clientId]) grouped[p.clientId] = []; grouped[p.clientId].push(p); });
+        Object.keys(grouped).forEach(k => grouped[k].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)));
+        setPrgs(grouped);
+      } catch (e) {
+        console.error("Load error:", e);
+        setCls(SAMPLE_CLIENTS);
+        setPrgs(INITIAL_PRGS);
+      }
+      setLoading(false);
+    })();
+  }, []);
+  const actCls = cls.filter(c => c.status === "active");
+
+  function ClForm({ client, onSave, onClose }) {
+    const [f, setF] = useState(client || { name: "", email: "", phone: "", level: "beginner", goals: "", healthNotes: "", injuries: [], includesRunning: false, monthNumber: 1, sessionsPerWeek: 3, sessionDuration: 60, day3Type: "glute", trainingLocation: "gym", cardioDaysPerWeek: 0, startDate: new Date().toISOString().split("T")[0], status: "active" });
+    const [ii, setII] = useState("");
+    return (
+      <Mdl title={client ? "Edit Client" : "New Client"} onClose={onClose}>
+        <Inp label="Full Name" value={f.name} onChange={v => setF({ ...f, name: v })} placeholder="e.g., Sofia Marchetti" />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}><Inp label="Email" value={f.email} onChange={v => setF({ ...f, email: v })} placeholder="email@example.com" /><Inp label="Phone" value={f.phone} onChange={v => setF({ ...f, phone: v })} placeholder="+39 ..." /></div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}><Inp label="Level" value={f.level} onChange={v => setF({ ...f, level: v })} options={[{ value: "beginner", label: "Beginner" }, { value: "intermediate", label: "Intermediate" }, { value: "advanced", label: "Advanced" }]} /><Inp label="Month #" value={f.monthNumber} onChange={v => setF({ ...f, monthNumber: parseInt(v) || 1 })} type="number" /><Inp label="Start Date" value={f.startDate} onChange={v => setF({ ...f, startDate: v })} type="date" /></div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}><Inp label="Sessions / Week" value={f.sessionsPerWeek} onChange={v => setF({ ...f, sessionsPerWeek: parseInt(v) })} options={[{ value: 2, label: "2 days/week" }, { value: 3, label: "3 days/week" }, { value: 4, label: "4 days/week" }, { value: 5, label: "5 days/week" }]} /><Inp label="Session Duration" value={f.sessionDuration} onChange={v => setF({ ...f, sessionDuration: parseInt(v) })} options={[{ value: 45, label: "45 min" }, { value: 60, label: "60 min" }, { value: 75, label: "75 min" }, { value: 90, label: "90 min" }]} /></div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}><Inp label="Training Location" value={f.trainingLocation || "gym"} onChange={v => setF({ ...f, trainingLocation: v })} options={[{ value: "gym", label: "🏋️ Gym" }, { value: "home", label: "🏠 Home Gym" }]} /><Inp label="Cardio Days / Week" value={f.cardioDaysPerWeek || 0} onChange={v => setF({ ...f, cardioDaysPerWeek: parseInt(v) })} options={[{ value: 0, label: "None" }, { value: 1, label: "1 day" }, { value: 2, label: "2 days" }, { value: 3, label: "3 days" }]} /></div>
+        {f.sessionsPerWeek === 3 && <Inp label="Day 3 Focus" value={f.day3Type || "glute"} onChange={v => setF({ ...f, day3Type: v })} options={[{ value: "glute", label: "Glute Focus" }, { value: "fullbody", label: "Full Body" }]} />}
+        <div style={{ background: K.ab, border: "1px solid " + K.ac + "30", borderRadius: 8, padding: 12, marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: K.ac, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Weekly Split Preview</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{buildDaySchedule(f.sessionsPerWeek, f.day3Type || "glute").map((t, i) => { const labels = { A: "Push+Squat", B: "Pull+Hinge", Q: "Quad+Push", H: "Hinge+Pull", G: "Glute Focus", F: "Full Body" }; const colors = { A: "#5dade2", B: "#f0a030", Q: "#5dade2", H: "#f0a030", G: "#e74c3c", F: "#2ecc71" }; return <span key={i} style={{ padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, background: colors[t] + "25", color: colors[t] }}>Day {i+1}: {labels[t]}</span>; })}</div>
+          {(f.cardioDaysPerWeek || 0) > 0 && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>{Array.from({ length: f.cardioDaysPerWeek }, (_, i) => <span key={"c"+i} style={{ padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, background: "rgba(46,204,113,0.15)", color: "#2ecc71" }}>Cardio {i+1}</span>)}</div>}
+          <div style={{ fontSize: 11, color: K.td, marginTop: 6 }}>{f.trainingLocation === "home" ? "🏠 Home" : "🏋️ Gym"} · {f.sessionDuration} min · {(f.sessionsPerWeek || 3) + (f.cardioDaysPerWeek || 0)} total days/week</div>
+        </div>
+        <Inp label="Goals" value={f.goals} onChange={v => setF({ ...f, goals: v })} textarea placeholder="Strength, weight loss, muscle tone..." />
+        <Inp label="Health Notes" value={f.healthNotes} onChange={v => setF({ ...f, healthNotes: v })} textarea placeholder="Any conditions, medications..." />
+        <div style={{ marginBottom: 14 }}><label style={{ display: "block", marginBottom: 6, fontSize: 12, fontWeight: 600, color: K.tm, textTransform: "uppercase", letterSpacing: "0.05em" }}>Injuries</label><input value={ii} onChange={e => setII(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && ii.trim()) { setF({ ...f, injuries: [...(f.injuries || []), ii.trim()] }); setII(""); } }} placeholder="Type + Enter" style={{ width: "100%", padding: "8px 12px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 8, color: K.tx, fontSize: 13, fontFamily: ff, outline: "none", boxSizing: "border-box", marginBottom: 8 }} /><div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{(f.injuries || []).map((inj, i) => <span key={i} onClick={() => setF({ ...f, injuries: f.injuries.filter((_, j) => j !== i) })} style={{ padding: "3px 10px", borderRadius: 6, fontSize: 12, background: K.dgb, color: K.dg, cursor: "pointer" }}>{inj} ×</span>)}</div></div>
+        {(f.cardioDaysPerWeek || 0) === 0 && <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 13, color: K.tx, marginBottom: 20 }}><div onClick={() => setF({ ...f, includesRunning: !f.includesRunning })} style={{ width: 40, height: 22, borderRadius: 11, background: f.includesRunning ? K.ac : K.bd, position: "relative", cursor: "pointer" }}><div style={{ position: "absolute", top: 2, left: f.includesRunning ? 20 : 2, width: 18, height: 18, borderRadius: 9, background: f.includesRunning ? "#0a0a0c" : K.tm, transition: "all 0.2s" }} /></div>Include running sessions</label>}
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}><Btn v="secondary" onClick={onClose}>Cancel</Btn><Btn onClick={() => { if (!f.name.trim()) return; onSave({ ...f, id: f.id || "cl_" + Date.now() }); }}>{client ? "Save" : "Add Client"}</Btn></div>
+      </Mdl>
+    );
+  }
+
+  // ─── PDF GENERATION ───
+  const pdfIcon = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg>;
+
+  const exportPDF = (prog) => {
+    try {
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const W = doc.internal.pageSize.getWidth();
+    const H = doc.internal.pageSize.getHeight();
+    const margin = 12;
+    let y = margin;
+
+    const accent = [15, 30, 75];
+    const accentText = [130, 200, 255];
+    const headerBg = [20, 40, 90];
+    const rowAlt = [235, 243, 255];
+    const white = [255, 255, 255];
+
+    // Title
+    doc.setFillColor(...accent);
+    doc.rect(0, 0, W, 22, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(...white);
+    doc.text(`${prog.clientName} — Blocco ${prog.monthNumber}`, margin, 14);
+    doc.setFontSize(9);
+    doc.setTextColor(...accentText);
+    doc.text(`${prog.level.toUpperCase()} · ${prog.sessionsPerWeek}x/week · ${prog.sessionDuration}min · ${prog.trainingLocation === "home" ? "Home Gym" : "Gym"}`, W - margin, 14, { align: "right" });
+    y = 28;
+
+    const fmtSR = (ex) => ex ? `${ex.sets}×${ex.reps}` : "";
+    const fmtRest = (r) => { const n = parseInt(r); if (!n) return String(r || ""); return n >= 120 ? (n / 60) + "'" : n + "''"; };
+
+    // For each day, merge block1 and block2 into one table
+    const numDays = Math.max(prog.block1.length, prog.block2.length);
+    for (let di = 0; di < numDays; di++) {
+      const d1 = prog.block1[di];
+      const d2 = prog.block2[di];
+      const dayLabel = (d1 || d2).dayLabel;
+      const dayFocus = (d1 || d2).focus;
+      const exs1 = d1 ? d1.exercises : [];
+      const exs2 = d2 ? d2.exercises : [];
+      const maxLen = Math.max(exs1.length, exs2.length);
+
+      // Check if we need a new page
+      const estHeight = 12 + maxLen * 6.5 + 8;
+      if (y + estHeight > H - 10) { doc.addPage(); y = margin; }
+
+      // Day header
+      doc.setFillColor(15, 30, 75);
+      doc.rect(margin, y, W - margin * 2, 8, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(255, 255, 255);
+      doc.text(`${dayLabel.toUpperCase()} — ${dayFocus.toUpperCase()}`, margin + 4, y + 5.5);
+      y += 10;
+
+      // Build rows
+      const rows = [];
+      let lastSection = "";
+      for (let ei = 0; ei < maxLen; ei++) {
+        const e1 = exs1[ei];
+        const e2 = exs2[ei];
+        const ex = e1 || e2;
+        if (!ex) continue;
+
+        // Section separator
+        if (ex.section !== lastSection && ex.section !== "Warm-Up") {
+          if (lastSection !== "" || ei > 0) {
+            rows.push([{ content: ex.section.toUpperCase(), colSpan: 6, styles: { fillColor: [25, 50, 110], textColor: [130, 200, 255], fontStyle: "bold", fontSize: 7, cellPadding: 1.5 } }]);
+          }
+          lastSection = ex.section;
+        } else if (ei === 0 && ex.section) {
+          lastSection = ex.section;
+        }
+
+        const name = ex.name + (ex.circuit ? " (" + ex.circuit.join(", ") + ")" : "");
+        const w12 = fmtSR(e1);
+        const w34 = fmtSR(e2);
+        const weight = (e1 || e2).weight || "—";
+        const rest = fmtRest((e1 || e2).rest);
+        const notes = (e1 || e2).notes || "";
+
+        rows.push([name, w12, w34, weight, rest, notes]);
+      }
+
+      autoTable(doc, {
+        startY: y,
+        margin: { left: margin, right: margin },
+        head: [["Esercizio", "Sett. 1-2", "Sett. 3-4", "Carico", "Rec.", "Note"]],
+        body: rows,
+        theme: "grid",
+        styles: { fontSize: 8, cellPadding: 2, lineColor: [220, 220, 225], lineWidth: 0.2 },
+        headStyles: { fillColor: headerBg, textColor: white, fontStyle: "bold", fontSize: 8 },
+        alternateRowStyles: { fillColor: rowAlt },
+        columnStyles: {
+          0: { cellWidth: 65, fontStyle: "bold" },
+          1: { cellWidth: 28, halign: "center" },
+          2: { cellWidth: 28, halign: "center" },
+          3: { cellWidth: 30, halign: "center" },
+          4: { cellWidth: 18, halign: "center" },
+          5: { cellWidth: "auto", fontStyle: "italic", fontSize: 7, textColor: [60, 80, 120] },
+        },
+      });
+      y = doc.lastAutoTable.finalY + 8;
+    }
+
+    // Cardio sections
+    if (prog.cardio) {
+      const c1 = prog.cardio.block1 || [];
+      const c2 = prog.cardio.block2 || [];
+      const maxC = Math.max(c1.length, c2.length);
+      if (maxC > 0) {
+        if (y + 40 > H - 10) { doc.addPage(); y = margin; }
+
+        doc.setFillColor(25, 50, 110);
+        doc.rect(margin, y, W - margin * 2, 8, "F");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.setTextColor(255, 255, 255);
+        doc.text("CARDIO PROGRAMMING", margin + 4, y + 5.5);
+        y += 10;
+
+        const cRows = [];
+        for (let ci = 0; ci < maxC; ci++) {
+          const s1 = c1[ci];
+          const s2 = c2[ci];
+          const s = s1 || s2;
+          cRows.push([
+            s.dayLabel || ("Cardio " + (ci + 1)),
+            s1 ? s1.type : "",
+            s1 ? s1.work : "",
+            s2 ? s2.type : "",
+            s2 ? s2.work : "",
+            s.rpe ? "RPE " + s.rpe : "",
+          ]);
+        }
+
+        autoTable(doc, {
+          startY: y,
+          margin: { left: margin, right: margin },
+          head: [["Day", "Type (W1-2)", "Work (W1-2)", "Type (W3-4)", "Work (W3-4)", "RPE"]],
+          body: cRows,
+          theme: "grid",
+          styles: { fontSize: 8, cellPadding: 2, lineColor: [220, 220, 225], lineWidth: 0.2 },
+          headStyles: { fillColor: [20, 40, 90], textColor: white, fontStyle: "bold", fontSize: 8 },
+          alternateRowStyles: { fillColor: [235, 243, 255] },
+          columnStyles: { 0: { cellWidth: 22, fontStyle: "bold" }, 1: { cellWidth: 32 }, 2: { cellWidth: "auto" }, 3: { cellWidth: 32 }, 4: { cellWidth: "auto" }, 5: { cellWidth: 20, halign: "center" } },
+        });
+        y = doc.lastAutoTable.finalY + 8;
+      }
+    }
+
+    // Running sections
+    if (prog.running) {
+      if (y + 30 > H - 10) { doc.addPage(); y = margin; }
+      doc.setFillColor(25, 50, 110);
+      doc.rect(margin, y, W - margin * 2, 8, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(255, 255, 255);
+      doc.text("RUNNING", margin + 4, y + 5.5);
+      y += 10;
+      const rRows = [];
+      const r1 = prog.running.block1 || [];
+      const r2 = prog.running.block2 || [];
+      const maxR = Math.max(r1.length, r2.length);
+      for (let ri = 0; ri < maxR; ri++) {
+        const s1 = r1[ri]; const s2 = r2[ri]; const s = s1 || s2;
+        rRows.push([s.day, s1 ? `${s1.type} · ${s1.duration}` : "", s1 ? s1.notes : "", s2 ? `${s2.type} · ${s2.duration}` : "", s2 ? s2.notes : ""]);
+      }
+      autoTable(doc, {
+        startY: y, margin: { left: margin, right: margin },
+        head: [["Day", "W1-2", "Notes", "W3-4", "Notes"]],
+        body: rRows, theme: "grid",
+        styles: { fontSize: 8, cellPadding: 2, lineColor: [220, 220, 225], lineWidth: 0.2 },
+        headStyles: { fillColor: [20, 40, 90], textColor: white, fontStyle: "bold", fontSize: 8 },
+        alternateRowStyles: { fillColor: [235, 243, 255] },
+      });
+    }
+
+    // Footer
+    const pages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(7);
+      doc.setTextColor(80, 100, 140);
+      doc.text(`TrainForge Pro · ${prog.clientName} · Blocco ${prog.monthNumber}`, margin, H - 5);
+      doc.text(`${i}/${pages}`, W - margin, H - 5, { align: "right" });
+    }
+
+    const filename = `${prog.clientName.replace(/\s+/g, "_")}_Blocco${prog.monthNumber}.pdf`;
+    doc.save(filename);
+    notify("PDF exported!");
+    } catch (err) { console.error("PDF error:", err); notify("PDF error: " + err.message, "warn"); }
+  };
+
+  function ProgEdit({ program, onSave, onBack }) {
+    const [p, setP] = useState(JSON.parse(JSON.stringify(program)));
+    const [ab, setAb] = useState(0);
+    const [ad, setAd] = useState(0);
+    const [exPk, setExPk] = useState(null);
+    const cb = ab === 0 ? p.block1 : p.block2;
+    const cd = cb[ad];
+    const upEx = (di, ei, fld, val) => { const bk = ab === 0 ? "block1" : "block2"; const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = [...np[bk][di].exercises]; np[bk][di].exercises[ei] = { ...np[bk][di].exercises[ei], [fld]: val }; setP(np); };
+    const rmEx = (di, ei) => { const bk = ab === 0 ? "block1" : "block2"; const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = np[bk][di].exercises.filter((_, i) => i !== ei); setP(np); };
+    const repEx = (di, ei, nx) => { const bk = ab === 0 ? "block1" : "block2"; const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = [...np[bk][di].exercises]; const o = np[bk][di].exercises[ei]; np[bk][di].exercises[ei] = { ...nx, section: o.section, sets: o.sets, reps: o.reps, rest: o.rest, weight: o.weight, rpe: o.rpe, notes: o.notes || "" }; setP(np); setExPk(null); };
+    const sc = s => ({ "Warm-Up": "#6eb5ff", Strength: K.ac, Accessories: K.int, Core: "#b388ff", Finisher: K.dg }[s] || K.tm);
+    return (
+      <div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}><button onClick={onBack} style={{ background: "none", border: "none", color: K.tm, cursor: "pointer", padding: 4 }}>{I.back}</button><div><h2 style={{ margin: 0, fontSize: 20, color: K.tx }}>{p.clientName}</h2><div style={{ fontSize: 12, color: K.tm, display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>Month {p.monthNumber} · <LvlBadge level={p.level} /><span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>{I.cal} {p.sessionsPerWeek}×/wk</span><span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>{I.clock} {p.sessionDuration}min</span>{p.trainingLocation === "home" && <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: "rgba(200,255,46,0.15)", color: K.ac }}>🏠 HOME</span>}{p.cardioDaysPerWeek > 0 && <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: "rgba(46,204,113,0.15)", color: "#2ecc71" }}>+{p.cardioDaysPerWeek} Cardio</span>}</div></div></div>
+          <div style={{ display: "flex", gap: 10 }}><Btn v="secondary" sm onClick={() => exportPDF(p)} icon={pdfIcon}>PDF</Btn><Btn v="secondary" sm onClick={() => { setP(JSON.parse(JSON.stringify(program))); notify("Reset", "warn"); }} icon={I.refresh}>Reset</Btn><Btn sm onClick={() => { onSave(p); notify("Saved!"); }}>Save</Btn></div>
+        </div>
+        <div style={{ display: "flex", gap: 2, marginBottom: 16, background: K.sf, borderRadius: 10, padding: 3 }}>{["Block 1 — Weeks 1-2", "Block 2 — Weeks 3-4"].map((l, i) => <button key={i} onClick={() => { setAb(i); setAd(0); }} style={{ flex: 1, padding: "10px 16px", border: "none", borderRadius: 8, fontFamily: ff, fontSize: 13, fontWeight: 600, cursor: "pointer", background: ab === i ? K.ac : "transparent", color: ab === i ? "#0a0a0c" : K.tm }}>{l}</button>)}</div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>{cb.map((d, i) => <button key={i} onClick={() => setAd(i)} style={{ padding: "8px 16px", border: "1px solid " + (ad === i ? K.ac : K.bd), borderRadius: 8, fontFamily: ff, fontSize: 12, fontWeight: 600, cursor: "pointer", background: ad === i ? K.ab : "transparent", color: ad === i ? K.ac : K.tm }}>{d.dayLabel} · {d.focus}</button>)}</div>
+        <div>{(() => { let ls = ""; return cd.exercises.map((ex, ei) => { const ss = ex.section !== ls; ls = ex.section; return (<div key={ei}>{ss && <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: ei > 0 ? 24 : 0, marginBottom: 10 }}><div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 3, height: 16, borderRadius: 2, background: sc(ex.section) }} /><span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: sc(ex.section) }}>{ex.section}</span></div><Btn v="ghost" sm onClick={() => setExPk({ di: ad, sec: ex.section })} icon={I.plus}>Add</Btn></div>}<div style={{ background: K.cd, border: "1px solid " + K.bd, borderRadius: 10, marginBottom: 6, padding: "10px 14px" }}><div style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto auto auto auto", gap: 8, alignItems: "center", fontSize: 13 }}><div style={{ color: K.tx, fontWeight: 500, cursor: "pointer" }} onClick={() => setExPk({ di: ad, sec: ex.section, idx: ei, rep: true })}>{ex.name}{ex.circuit && <span style={{ fontSize: 11, color: K.td, marginLeft: 6 }}>({ex.circuit.join(", ")})</span>}</div>{["sets","reps","rest","weight","rpe"].map(fld => <div key={fld} style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: fld === "reps" ? 65 : fld === "weight" ? 55 : 40 }}><span style={{ fontSize: 9, color: K.td, textTransform: "uppercase" }}>{fld}</span><input value={ex[fld]} onChange={e => upEx(ad, ei, fld, e.target.value)} style={{ width: fld === "reps" ? 70 : fld === "weight" ? 55 : 45, padding: "4px 6px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 5, color: K.tx, fontSize: 13, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>)}<button onClick={() => rmEx(ad, ei)} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 4, opacity: 0.6 }}>{I.trash}</button></div><input value={ex.notes || ""} onChange={e => upEx(ad, ei, "notes", e.target.value)} placeholder="Notes (e.g., tempo, cues, weight guidance...)" style={{ width: "100%", marginTop: 6, padding: "5px 10px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 5, color: K.tm, fontSize: 11, fontFamily: ff, outline: "none", boxSizing: "border-box" }} /></div></div>); }); })()}</div>
+        {p.includesRunning && p.running && <div style={{ marginTop: 28 }}><div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}><div style={{ width: 3, height: 16, borderRadius: 2, background: K.ok }} /><span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: K.ok }}>Running</span></div>{(ab === 0 ? p.running.block1 : p.running.block2).map((r, i) => <Crd key={i} style={{ marginBottom: 8, padding: 14 }}><div style={{ display: "flex", justifyContent: "space-between" }}><div><span style={{ fontWeight: 600, color: K.tx, fontSize: 13 }}>{r.day}</span><span style={{ color: K.tm, fontSize: 12, marginLeft: 12 }}>{r.type} · {r.duration}</span></div><span style={{ fontSize: 12, color: K.td }}>{r.notes}</span></div></Crd>)}</div>}
+        {p.cardio && <div style={{ marginTop: 28 }}><div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}><div style={{ width: 3, height: 16, borderRadius: 2, background: "#2ecc71" }} /><span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#2ecc71" }}>Cardio Programming</span></div>{(ab === 0 ? p.cardio.block1 : p.cardio.block2).map((c, i) => <Crd key={i} style={{ marginBottom: 8, padding: 14 }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}><div><span style={{ fontWeight: 600, color: K.tx, fontSize: 13 }}>{c.dayLabel}</span><span style={{ color: "#2ecc71", fontSize: 12, marginLeft: 10, fontWeight: 600 }}>{c.type}</span>{c.rpe && <span style={{ color: K.td, fontSize: 11, marginLeft: 8 }}>RPE {c.rpe}</span>}</div></div><div style={{ marginTop: 8, fontSize: 12, color: K.tm, display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px" }}><span style={{ color: K.td }}>Warm-up:</span><span>{c.warmup}</span><span style={{ color: K.td }}>Work:</span><span style={{ color: K.tx, fontWeight: 500 }}>{c.work}</span><span style={{ color: K.td }}>Cool-down:</span><span>{c.cooldown}</span></div></Crd>)}</div>}
+        {exPk && <ExPick section={exPk.sec} dayType={cd.dayType} location={p.trainingLocation || "gym"} onSelect={ex => { if (exPk.rep && exPk.idx != null) { repEx(exPk.di, exPk.idx, ex); } else { const bk = ab === 0 ? "block1" : "block2"; const np = { ...p }; np[bk] = [...np[bk]]; np[bk][exPk.di] = { ...np[bk][exPk.di] }; const exs = [...np[bk][exPk.di].exercises]; const ic = ex.category === "compound"; const lc = p.levelCfg; const ne = { ...ex, section: exPk.sec, sets: ic ? lc.compoundSets : lc.accessorySets, reps: ic ? lc.compoundReps : lc.accessoryReps, rest: ic ? lc.restCompound : lc.restAccessory, weight: "—", rpe: ic ? lc.compoundRPE : lc.accessoryRPE, notes: "" }; let ia = exs.length; for (let i = exs.length - 1; i >= 0; i--) { if (exs[i].section === exPk.sec) { ia = i + 1; break; } } exs.splice(ia, 0, ne); np[bk][exPk.di].exercises = exs; setP(np); setExPk(null); } }} onClose={() => setExPk(null)} />}
+      </div>
+    );
+  }
+
+  function ExPick({ section, dayType, location, onSelect, onClose }) {
+    const [ft, setFt] = useState("");
+    const getSectionCats = () => { if (section === "Warm-Up") return ["mobility"]; if (section === "Core") return ["core"]; if (section === "Finisher") return ["hiit"]; if (section === "Strength") { if (dayType === "A" || dayType === "Q") return ["compound_push_squat"]; if (dayType === "B" || dayType === "H") return ["compound_pull_hinge"]; if (dayType === "G") return ["compound_pull_hinge", "accessory_pull_hinge"]; return ["compound_push_squat", "compound_pull_hinge"]; } if (section === "Accessories") { if (dayType === "A" || dayType === "Q") return ["accessory_push_squat", "accessory_pull_hinge"]; if (dayType === "B" || dayType === "H") return ["accessory_pull_hinge"]; return ["accessory_push_squat", "accessory_pull_hinge"]; } return Object.keys(EXERCISES); };
+    const fl = getSectionCats().flatMap(c => filterLoc(EXERCISES[c] || [], location || "gym")).filter(e => e.name.toLowerCase().includes(ft.toLowerCase()));
+    return (<Mdl title={"Select — " + section} onClose={onClose} wide><div style={{ position: "relative", marginBottom: 16 }}><input value={ft} onChange={e => setFt(e.target.value)} placeholder="Search..." style={{ width: "100%", padding: "10px 14px 10px 36px", background: K.bg, border: "1px solid " + K.bd, borderRadius: 8, color: K.tx, fontSize: 13, fontFamily: ff, outline: "none", boxSizing: "border-box" }} /><div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: K.td }}>{I.search}</div></div><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, maxHeight: 400, overflowY: "auto" }}>{fl.map(ex => <div key={ex.id} onClick={() => onSelect(ex)} style={{ padding: "12px 14px", background: K.cd, border: "1px solid " + K.bd, borderRadius: 8, cursor: "pointer", transition: "all 0.12s" }} onMouseEnter={e => { e.currentTarget.style.borderColor = K.ac; e.currentTarget.style.background = K.ab; }} onMouseLeave={e => { e.currentTarget.style.borderColor = K.bd; e.currentTarget.style.background = K.cd; }}><div style={{ fontWeight: 600, fontSize: 13, color: K.tx, marginBottom: 4 }}>{ex.name}</div><div style={{ fontSize: 11, color: K.td }}>{ex.category}{ex.equipment ? " · " + ex.equipment : ""}{ex.muscles ? " · " + ex.muscles.join(", ") : ""}</div></div>)}</div></Mdl>);
+  }
+
+  // ─── PROGRAM HISTORY VIEW ───
+  function ProgHistory({ client, programs, onSelectProgram, onBack }) {
+    const getDiff = (curr, prev) => { if (!prev) return { added: [], removed: [], kept: [] }; const pIds = extractPrevIds(prev); const cIds = extractPrevIds(curr); return { added: [...cIds].filter(id => !pIds.has(id)), removed: [...pIds].filter(id => !cIds.has(id)), kept: [...cIds].filter(id => pIds.has(id)) }; };
+    return (
+      <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}><button onClick={onBack} style={{ background: "none", border: "none", color: K.tm, cursor: "pointer", padding: 4 }}>{I.back}</button><div><h2 style={{ margin: 0, fontSize: 20, color: K.tx }}>Program History — {client.name}</h2><div style={{ fontSize: 12, color: K.tm, marginTop: 4 }}>{programs.length} program{programs.length !== 1 ? "s" : ""}</div></div></div>
+        {programs.length === 0 ? <Crd style={{ textAlign: "center", padding: 40 }}><div style={{ color: K.td, fontSize: 14 }}>No programs generated yet.</div></Crd> :
+        <div style={{ position: "relative", paddingLeft: 28 }}>
+          <div style={{ position: "absolute", left: 10, top: 8, bottom: 8, width: 2, background: K.bd }} />
+          {[...programs].reverse().map((prog, idx) => {
+            const realIdx = programs.length - 1 - idx;
+            const prev = realIdx > 0 ? programs[realIdx - 1] : null;
+            const diff = getDiff(prog, prev);
+            const isLatest = idx === 0;
+            const exCount = (prog.block1?.reduce((a, d) => a + d.exercises.filter(e => e.section === "Strength" || e.section === "Accessories").length, 0) || 0) + (prog.block2?.reduce((a, d) => a + d.exercises.filter(e => e.section === "Strength" || e.section === "Accessories").length, 0) || 0);
+            return (
+              <div key={prog.id} style={{ position: "relative", marginBottom: 16 }}>
+                <div style={{ position: "absolute", left: -24, top: 16, width: 12, height: 12, borderRadius: 6, background: isLatest ? K.ac : K.bd, border: isLatest ? "none" : "2px solid " + K.td }} />
+                <Crd onClick={() => onSelectProgram(prog)} style={{ cursor: "pointer", borderLeft: "3px solid " + (isLatest ? K.ac : K.bd) }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}><span style={{ fontWeight: 700, fontSize: 16, color: K.tx }}>Month {prog.monthNumber}</span>{isLatest && <Badge color={K.ac}>Current</Badge>}<LvlBadge level={prog.level} /></div>
+                      <div style={{ fontSize: 12, color: K.tm, display: "flex", gap: 12, flexWrap: "wrap" }}><span>{prog.sessionsPerWeek}×/wk · {prog.sessionDuration}min</span><span>{exCount} exercises</span><span>{new Date(prog.createdAt).toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" })}</span></div>
+                    </div>
+                    <div style={{ color: K.td }}>{I.chevron}</div>
+                  </div>
+                  {prev && <div style={{ marginTop: 12, display: "flex", gap: 16, fontSize: 11 }}>{diff.added.length > 0 && <span style={{ color: K.ok }}>+{diff.added.length} new</span>}{diff.removed.length > 0 && <span style={{ color: K.dg }}>-{diff.removed.length} rotated out</span>}{diff.kept.length > 0 && <span style={{ color: K.tm }}>{diff.kept.length} kept</span>}</div>}
+                  <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>{prog.block1?.map((d, di) => <span key={di} style={{ padding: "3px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: K.ac + "15", color: K.ac }}>{d.dayLabel}: {d.focus}</span>)}{prog.cardioDaysPerWeek > 0 && <span style={{ padding: "3px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: "rgba(46,204,113,0.15)", color: "#2ecc71" }}>+{prog.cardioDaysPerWeek} Cardio</span>}</div>
+                </Crd>
+              </div>
+            );
+          })}
+        </div>}
+      </div>
+    );
+  }
+
+  function Dash() {
+    const np = actCls.filter(c => !getLatest(prgs, c.id));
+    const totalProgs = Object.values(prgs).reduce((a, arr) => a + arr.length, 0);
+    return (
+      <div>
+        <div style={{ marginBottom: 28 }}><h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: K.tx }}>Dashboard</h1><p style={{ margin: "6px 0 0", color: K.tm, fontSize: 14 }}>Training business overview</p></div>
+        <div style={{ display: "flex", gap: 14, marginBottom: 28, flexWrap: "wrap" }}><Stat label="Active Clients" value={actCls.length} sub={cls.length + " total"} icon={I.users} /><Stat label="Programs" value={totalProgs} sub="total generated" icon={I.program} /><Stat label="Need Program" value={np.length} sub="pending" icon={I.bolt} /><Stat label="Exercises" value={ALL_EXERCISES.length} sub="in library" icon={I.library} /></div>
+        {np.length > 0 && <div style={{ marginBottom: 28 }}><h3 style={{ fontSize: 15, color: K.tx, marginBottom: 12 }}>Needs Program</h3><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>{np.map(c => <Crd key={c.id} onClick={() => { setSelCl(c); setPg("clients"); }} style={{ cursor: "pointer", borderLeft: "3px solid " + K.wn }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><div style={{ fontWeight: 600, color: K.tx, fontSize: 14 }}>{c.name}</div><div style={{ fontSize: 12, color: K.tm, marginTop: 4 }}>Month {c.monthNumber} · <LvlBadge level={c.level} /> · {c.sessionsPerWeek}×/wk · {c.sessionDuration}min</div></div><div style={{ color: K.td }}>{I.chevron}</div></div></Crd>)}</div></div>}
+        {totalProgs > 0 && <div><h3 style={{ fontSize: 15, color: K.tx, marginBottom: 12 }}>Recent Programs</h3><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>{Object.entries(prgs).flatMap(([cId, arr]) => arr.map(p => ({ ...p, _cId: cId }))).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 6).map(p => <Crd key={p.id} onClick={() => { const c = cls.find(x => x.id === p._cId); if (c) { setSelCl(c); setSelPr(p); setPg("clients"); } }} style={{ cursor: "pointer", borderLeft: "3px solid " + K.ac }}><div style={{ fontWeight: 600, color: K.tx, fontSize: 14 }}>{p.clientName}</div><div style={{ fontSize: 12, color: K.tm, marginTop: 4 }}>Month {p.monthNumber} · {p.sessionsPerWeek}×/wk · {p.sessionDuration}min · {new Date(p.createdAt).toLocaleDateString()}</div></Crd>)}</div></div>}
+      </div>
+    );
+  }
+
+  function Clients() {
+    const [histCl, setHistCl] = useState(null);
+    const fl = cls.filter(c => c.name.toLowerCase().includes(sq.toLowerCase()) || c.level.includes(sq.toLowerCase()));
+    if (selCl && selPr) return <ProgEdit program={selPr} onSave={u => { setPrgs(updProg(prgs, u.clientId, u)); setSelPr(u); dbSave("programs", prToDb(u)).catch(console.error); }} onBack={() => setSelPr(null)} />;
+    if (selCl && histCl) return <ProgHistory client={selCl} programs={getAll(prgs, selCl.id)} onSelectProgram={p => { setSelPr(p); setHistCl(null); }} onBack={() => setHistCl(null)} />;
+    if (selCl) {
+      const c = selCl, cp = getLatest(prgs, c.id), allP = getAll(prgs, c.id);
+      const handleGenerate = () => { const p = generateProgram(c, cp); setPrgs(addProg(prgs, c.id, p)); setSelPr(p); const upd = { ...c, monthNumber: p.monthNumber }; setCls(cls.map(x => x.id === c.id ? upd : x)); setSelCl(upd); dbSave("programs", prToDb(p)).catch(console.error); dbSave("clients", clToDb(upd)).catch(console.error); notify("Generated Month " + p.monthNumber + "!"); };
+      return (
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}><button onClick={() => setSelCl(null)} style={{ background: "none", border: "none", color: K.tm, cursor: "pointer", padding: 4 }}>{I.back}</button><h2 style={{ margin: 0, fontSize: 22, color: K.tx }}>{c.name}</h2><LvlBadge level={c.level} /></div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+            <Crd><h4 style={{ margin: "0 0 12px", fontSize: 13, color: K.tm, textTransform: "uppercase" }}>Details</h4><div style={{ fontSize: 13, color: K.tx, lineHeight: 2 }}><div><span style={{ color: K.td }}>Email:</span> {c.email}</div><div><span style={{ color: K.td }}>Phone:</span> {c.phone}</div><div><span style={{ color: K.td }}>Start:</span> {c.startDate}</div><div><span style={{ color: K.td }}>Month:</span> {c.monthNumber}</div><div><span style={{ color: K.td }}>Location:</span> {c.trainingLocation === "home" ? "🏠 Home Gym" : "🏋️ Gym"}</div><div><span style={{ color: K.td }}>Sessions:</span> {c.sessionsPerWeek}×/week</div><div><span style={{ color: K.td }}>Duration:</span> {c.sessionDuration} min</div><div><span style={{ color: K.td }}>Cardio:</span> {(c.cardioDaysPerWeek || 0) > 0 ? c.cardioDaysPerWeek + " days/week" : c.includesRunning ? "Running" : "No"}</div></div></Crd>
+            <Crd><h4 style={{ margin: "0 0 12px", fontSize: 13, color: K.tm, textTransform: "uppercase" }}>Goals & Health</h4><div style={{ fontSize: 13, color: K.tx, lineHeight: 2 }}><div><span style={{ color: K.td }}>Goals:</span> {c.goals}</div><div><span style={{ color: K.td }}>Health:</span> {c.healthNotes || "None"}</div><div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}><span style={{ color: K.td }}>Injuries:</span>{c.injuries?.length ? c.injuries.map((inj, i) => <Badge key={i} color={K.dg}>{inj}</Badge>) : <span style={{ color: K.td }}>None</span>}</div></div></Crd>
+          </div>
+          <Crd style={{ marginBottom: 24, background: K.ab, borderColor: K.ac + "30" }}><div style={{ fontSize: 12, fontWeight: 600, color: K.ac, textTransform: "uppercase", marginBottom: 8 }}>Weekly Schedule</div><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{buildDaySchedule(c.sessionsPerWeek, c.day3Type || "glute").map((t, i) => { const labels = { A: "Push+Squat", B: "Pull+Hinge", Q: "Quad+Push", H: "Hinge+Pull", G: "Glute Focus", F: "Full Body" }; const colors = { A: "#5dade2", B: "#f0a030", Q: "#5dade2", H: "#f0a030", G: "#e74c3c", F: "#2ecc71" }; return <div key={i} style={{ padding: "8px 14px", borderRadius: 8, background: colors[t] + "20", border: "1px solid " + colors[t] + "50" }}><div style={{ fontSize: 11, fontWeight: 700, color: colors[t], marginBottom: 2 }}>Day {i+1}</div><div style={{ fontSize: 12, color: K.tx }}>{labels[t]}</div></div>; })}{c.includesRunning && <div style={{ padding: "8px 14px", borderRadius: 8, background: "rgba(46,204,113,0.12)", border: "1px solid rgba(46,204,113,0.3)" }}><div style={{ fontSize: 11, fontWeight: 700, color: K.ok, marginBottom: 2 }}>Off-Day</div><div style={{ fontSize: 12, color: K.tx }}>Running</div></div>}</div></Crd>
+          <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap" }}>
+            <Btn onClick={handleGenerate} icon={I.bolt}>{cp ? "Generate Month " + ((cp.monthNumber || 1) + 1) : "Generate Program"}</Btn>
+            {cp && <Btn v="secondary" onClick={() => setSelPr(cp)} icon={I.edit}>Edit Current</Btn>}
+            {cp && <Btn v="secondary" onClick={() => exportPDF(cp)} icon={pdfIcon}>Export PDF</Btn>}
+            {allP.length > 0 && <Btn v="secondary" onClick={() => setHistCl(c)} icon={I.history}>History ({allP.length})</Btn>}
+            <Btn v="secondary" onClick={() => { setEditCl(c); setShowCM(true); }} icon={I.edit}>Edit Client</Btn>
+          </div>
+          {cp && <Crd style={{ marginBottom: 16 }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><h4 style={{ margin: 0, fontSize: 14, color: K.tx }}>Current Program — Month {cp.monthNumber}</h4><span style={{ fontSize: 11, color: K.td }}>{new Date(cp.createdAt).toLocaleDateString()}</span></div><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>{["Block 1 (Wk 1-2)", "Block 2 (Wk 3-4)"].map((l, bi) => <div key={bi} style={{ background: K.bg, borderRadius: 8, padding: 14 }}><div style={{ fontSize: 12, fontWeight: 600, color: K.ac, marginBottom: 10 }}>{l}</div>{(bi === 0 ? cp.block1 : cp.block2).map((d, di) => <div key={di} style={{ marginBottom: 8 }}><div style={{ fontSize: 12, fontWeight: 600, color: K.tx }}>{d.dayLabel}: {d.focus}</div><div style={{ fontSize: 11, color: K.td }}>{d.exercises.length} exercises</div></div>)}</div>)}</div></Crd>}
+          {allP.length > 1 && <Crd><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><h4 style={{ margin: 0, fontSize: 14, color: K.tx }}>Program Timeline</h4><Btn v="ghost" sm onClick={() => setHistCl(c)} icon={I.history}>View All</Btn></div><div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>{allP.map((prog, i) => { const isLast = i === allP.length - 1; return <div key={prog.id} onClick={() => setSelPr(prog)} style={{ minWidth: 120, padding: "10px 14px", borderRadius: 8, background: isLast ? K.ab : K.bg, border: "1px solid " + (isLast ? K.ac + "50" : K.bd), cursor: "pointer", textAlign: "center", flexShrink: 0 }}><div style={{ fontSize: 18, fontWeight: 700, color: isLast ? K.ac : K.tx, fontFamily: mf }}>{prog.monthNumber}</div><div style={{ fontSize: 10, color: K.td, marginTop: 2 }}>Month</div><div style={{ fontSize: 10, color: K.tm, marginTop: 4 }}>{new Date(prog.createdAt).toLocaleDateString("it-IT", { day: "numeric", month: "short" })}</div></div>; })}</div></Crd>}
+        </div>
+      );
+    }
+    return (
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}><div><h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: K.tx }}>Clients</h1><p style={{ margin: "6px 0 0", color: K.tm, fontSize: 14 }}>{actCls.length} active</p></div><Btn onClick={() => { setEditCl(null); setShowCM(true); }} icon={I.plus}>New Client</Btn></div>
+        <div style={{ position: "relative", marginBottom: 20 }}><input value={sq} onChange={e => setSq(e.target.value)} placeholder="Search..." style={{ width: "100%", padding: "12px 16px 12px 40px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 10, color: K.tx, fontSize: 14, fontFamily: ff, outline: "none", boxSizing: "border-box" }} /><div style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: K.td }}>{I.search}</div></div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>{fl.map(c => { const lp = getLatest(prgs, c.id); const pc = getAll(prgs, c.id).length; return <Crd key={c.id} onClick={() => setSelCl(c)} style={{ cursor: "pointer", borderLeft: "3px solid " + (lp ? K.ac : K.bd) }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}><div><div style={{ fontWeight: 600, color: K.tx, fontSize: 15, marginBottom: 6 }}>{c.name}</div><div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}><LvlBadge level={c.level} /><span style={{ fontSize: 12, color: K.tm }}>Mo.{c.monthNumber} · {c.sessionsPerWeek}×/wk · {c.sessionDuration}min</span>{c.trainingLocation === "home" && <Badge color={K.ac}>🏠 Home</Badge>}{(c.cardioDaysPerWeek || 0) > 0 && <Badge color="#2ecc71">+{c.cardioDaysPerWeek} Cardio</Badge>}</div><div style={{ fontSize: 12, color: K.td }}>{c.goals}</div></div><div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>{lp ? <Badge color={K.ac}>Mo.{lp.monthNumber} ✓</Badge> : <Badge color={K.wn}>Pending</Badge>}{pc > 1 && <span style={{ fontSize: 10, color: K.td }}>{pc} programs</span>}<div style={{ color: K.td }}>{I.chevron}</div></div></div></Crd>; })}</div>
+      </div>
+    );
+  }
+
+  function Programs() {
+    if (selPr) return <ProgEdit program={selPr} onSave={u => { setPrgs(updProg(prgs, u.clientId, u)); setSelPr(u); dbSave("programs", prToDb(u)).catch(console.error); }} onBack={() => setSelPr(null)} />;
+    const all = Object.entries(prgs).flatMap(([, arr]) => arr).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    return (<div><div style={{ marginBottom: 24 }}><h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: K.tx }}>Programs</h1><p style={{ margin: "6px 0 0", color: K.tm, fontSize: 14 }}>{all.length} programs</p></div>{all.length === 0 ? <Crd style={{ textAlign: "center", padding: 40 }}><div style={{ color: K.td, fontSize: 14 }}>No programs yet.</div></Crd> : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>{all.map(p => <Crd key={p.id} onClick={() => setSelPr(p)} style={{ cursor: "pointer" }}><div style={{ fontWeight: 600, color: K.tx, fontSize: 15, marginBottom: 6 }}>{p.clientName}</div><div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}><LvlBadge level={p.level} /><span style={{ fontSize: 12, color: K.tm }}>Mo.{p.monthNumber} · {p.sessionsPerWeek}×/wk · {p.sessionDuration}min</span></div><div style={{ fontSize: 12, color: K.td }}>{p.block1.reduce((a, d) => a + d.exercises.length, 0) + p.block2.reduce((a, d) => a + d.exercises.length, 0)} exercises · {new Date(p.createdAt).toLocaleDateString()}</div></Crd>)}</div>}</div>);
+  }
+
+  function Library() {
+    const [ac, setAc] = useState("compound_push_squat");
+    return (<div><div style={{ marginBottom: 24 }}><h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: K.tx }}>Exercise Library</h1><p style={{ margin: "6px 0 0", color: K.tm, fontSize: 14 }}>{ALL_EXERCISES.length} exercises</p></div><div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>{Object.keys(EXERCISES).map(cat => <button key={cat} onClick={() => setAc(cat)} style={{ padding: "8px 16px", border: "1px solid " + (ac === cat ? K.ac : K.bd), borderRadius: 8, fontFamily: ff, fontSize: 12, fontWeight: 600, cursor: "pointer", background: ac === cat ? K.ab : "transparent", color: ac === cat ? K.ac : K.tm, textTransform: "capitalize" }}>{cat.replace(/_/g, " ")} ({EXERCISES[cat].length})</button>)}</div><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(250px,1fr))", gap: 10 }}>{EXERCISES[ac].map(ex => <Crd key={ex.id} style={{ padding: 16 }}><div style={{ fontWeight: 600, fontSize: 14, color: K.tx, marginBottom: 6 }}>{ex.name}</div><div style={{ fontSize: 12, color: K.td }}>{ex.equipment ? "Equipment: " + ex.equipment : ""}{ex.muscles ? " · " + ex.muscles.join(", ") : ""}</div></Crd>)}</div></div>);
+  }
+
+  const nav = [{ id: "dashboard", label: "Dashboard", icon: I.dashboard }, { id: "clients", label: "Clients", icon: I.users }, { id: "programs", label: "Programs", icon: I.program }, { id: "library", label: "Library", icon: I.library }];
+  if (loading) return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: K.bg, fontFamily: ff }}>
+      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+      <div style={{ textAlign: "center" }}>
+        <div style={{ width: 48, height: 48, borderRadius: 12, background: K.ac, display: "flex", alignItems: "center", justifyContent: "center", color: "#0a0a0c", margin: "0 auto 16px", animation: "pulse 1.5s ease infinite" }}>{I.bolt}</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: K.tx, marginBottom: 8 }}>TrainForge Pro</div>
+        <div style={{ fontSize: 13, color: K.tm }}>Loading from Supabase...</div>
+      </div>
+      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}`}</style>
+    </div>
+  );
+  return (
+    <div style={{ display: "flex", minHeight: "100vh", background: K.bg, fontFamily: ff, color: K.tx }}>
+      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+      <nav style={{ width: 220, minHeight: "100vh", background: K.sf, borderRight: "1px solid " + K.bd, padding: "20px 0", display: "flex", flexDirection: "column", flexShrink: 0 }}>
+        <div style={{ padding: "0 20px 24px", borderBottom: "1px solid " + K.bd, marginBottom: 16 }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ width: 32, height: 32, borderRadius: 8, background: K.ac, display: "flex", alignItems: "center", justifyContent: "center", color: "#0a0a0c" }}>{I.bolt}</div><div><div style={{ fontWeight: 700, fontSize: 15, color: K.tx, letterSpacing: "-0.02em" }}>TrainForge</div><div style={{ fontSize: 10, color: K.td, textTransform: "uppercase", letterSpacing: "0.08em" }}>Pro Dashboard</div></div></div></div>
+        {nav.map(n => <button key={n.id} onClick={() => { setPg(n.id); setSelCl(null); setSelPr(null); }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 20px", border: "none", background: pg === n.id ? K.ab : "transparent", color: pg === n.id ? K.ac : K.tm, fontFamily: ff, fontSize: 13, fontWeight: 600, cursor: "pointer", borderLeft: pg === n.id ? "2px solid " + K.ac : "2px solid transparent", width: "100%", textAlign: "left" }}>{n.icon}{n.label}</button>)}
+      </nav>
+      <main style={{ flex: 1, padding: "28px 36px", overflowY: "auto", maxHeight: "100vh" }}>{pg === "dashboard" && <Dash />}{pg === "clients" && <Clients />}{pg === "programs" && <Programs />}{pg === "library" && <Library />}</main>
+      {showCM && <ClForm client={editCl} onClose={() => { setShowCM(false); setEditCl(null); }} onSave={c => { if (editCl) { setCls(cls.map(x => x.id === c.id ? c : x)); if (selCl?.id === c.id) setSelCl(c); } else setCls([...cls, c]); dbSave("clients", clToDb(c)).catch(console.error); setShowCM(false); setEditCl(null); notify(editCl ? "Updated!" : "Added!"); }} />}
+      {ntf && <div style={{ position: "fixed", bottom: 24, right: 24, padding: "12px 20px", borderRadius: 10, background: ntf.t === "warn" ? "#332800" : "#0a2e12", border: "1px solid " + (ntf.t === "warn" ? K.wn : K.ok) + "30", color: ntf.t === "warn" ? K.wn : K.ok, fontSize: 13, fontWeight: 600, fontFamily: ff, display: "flex", alignItems: "center", gap: 8, zIndex: 2000, animation: "slideUp 0.3s ease" }}>{I.check} {ntf.m}</div>}
+      <style>{`@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}*{box-sizing:border-box}::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:${K.bg}}::-webkit-scrollbar-thumb{background:${K.bd};border-radius:3px}select option{background:${K.sf};color:${K.tx}}input:focus,select:focus,textarea:focus{border-color:${K.ac}!important}`}</style>
+    </div>
+  );
+}
