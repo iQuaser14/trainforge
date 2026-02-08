@@ -334,6 +334,7 @@ const I = {
   clock: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
   cal: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
   history: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>,
+  upload: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
 };
 
 // ─── SAMPLE DATA ───
@@ -374,6 +375,336 @@ function Mdl({ title, onClose, children, wide }) {
   return (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }} onClick={onClose}><div onClick={e => e.stopPropagation()} style={{ background: K.sf, border: "1px solid " + K.bd, borderRadius: 16, padding: 28, width: "100%", maxWidth: wide ? 700 : 500, maxHeight: "85vh", overflowY: "auto" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}><h3 style={{ margin: 0, fontSize: 18, color: K.tx }}>{title}</h3><button onClick={onClose} style={{ background: "none", border: "none", color: K.tm, fontSize: 22, cursor: "pointer" }}>×</button></div>{children}</div></div>);
 }
 function Stat({ label, value, sub, icon }) { return <Crd style={{ flex: 1, minWidth: 140 }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}><div><div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: K.tm, marginBottom: 8 }}>{label}</div><div style={{ fontSize: 28, fontWeight: 700, color: K.tx, fontFamily: mf }}>{value}</div>{sub && <div style={{ fontSize: 12, color: K.td, marginTop: 4 }}>{sub}</div>}</div><div style={{ color: K.ac, opacity: 0.6 }}>{icon}</div></div></Crd>; }
+
+function ImportModal({ cls, setCls, prgs, setPrgs, onClose, notify, dbSave, clToDb, prToDb }) {
+  const [tab, setTab] = useState("pdf");
+  const [files, setFiles] = useState([]);
+  const [parsing, setParsing] = useState(false);
+  const [progress, setProgress] = useState("");
+  const [preview, setPreview] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [jsonText, setJsonText] = useState("");
+
+  const PARSE_PROMPT = `You are a fitness program parser. Given a PDF of a training program, extract ALL data into this EXACT JSON format. Respond ONLY with valid JSON, no markdown, no backticks, no explanation.
+
+{
+  "client": {
+    "name": "Client surname (from filename or header)",
+    "level": "beginner|intermediate|advanced",
+    "sessionsPerWeek": 3,
+    "sessionDuration": 60,
+    "day3Type": "glute|fullbody",
+    "trainingLocation": "gym|home",
+    "cardioDaysPerWeek": 0,
+    "goals": "",
+    "healthNotes": "",
+    "injuries": [],
+    "includesRunning": false,
+    "startDate": "2025-01-01",
+    "status": "active"
+  },
+  "program": {
+    "monthNumber": 1,
+    "blockLabel": "Block description",
+    "block1": [
+      {
+        "dayLabel": "Day 1",
+        "focus": "Lower Body + Core",
+        "dayType": "Q",
+        "exercises": [
+          {
+            "id": "unique_id",
+            "name": "Exercise Name (keep original language, e.g. Italian)",
+            "category": "compound|isolation|core|mobility|hiit",
+            "section": "Strength|Accessories|Core|Finisher|Warm-Up",
+            "sets": 4,
+            "reps": "8",
+            "rest": 120,
+            "weight": "60kg",
+            "rpe": "RPE7",
+            "notes": "tempo, technique cues, etc."
+          }
+        ]
+      }
+    ],
+    "block2": [],
+    "cardio": null,
+    "running": null
+  }
+}
+
+RULES:
+- "block1" = weeks 1-2 (or first half), "block2" = weeks 3-4 (or second half). If only one block exists, put it in block1 and leave block2 as empty copy or same.
+- dayType: Q=quad/push, H=hinge/pull, G=glute, F=fullbody
+- section: group exercises by Strength (main lifts), Accessories (secondary), Core (abs/stability), Finisher (EMOM/AMRAP/circuits), Warm-Up
+- Keep exercise names in their ORIGINAL language (Italian, English, etc.)
+- For supersets, put both exercises as separate entries with notes "Superset with X"
+- For circuits/EMOM/AMRAP, put as single exercise in Finisher section with full description in notes
+- rest in seconds
+- weight: include unit (kg, lb) or "bodyweight" or "—" if not specified
+- If the PDF contains multiple weeks with different weights/reps, use W1-2 for block1 and W3-4 for block2
+- For cardio/running days, include them in the "cardio" field as array: [{"week":"W1","sessions":[{"type":"Easy Run","description":"8k Zone 2"}]}]
+- For running programs, include in "running" field similarly
+- If you can detect the month/block number from context, set monthNumber accordingly
+- Generate unique exercise IDs like "ex_1", "ex_2", etc.`;
+
+  const toBase64 = (file) => new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(",")[1]);
+    r.onerror = () => rej(new Error("Failed to read file"));
+    r.readAsDataURL(file);
+  });
+
+  const parsePDF = async (file) => {
+    const b64 = await toBase64(file);
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 8000,
+        system: PARSE_PROMPT,
+        messages: [{
+          role: "user",
+          content: [
+            { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } },
+            { type: "text", text: "Parse this training program PDF. The filename is: " + file.name + ". Extract all exercises, sets, reps, weights, rest periods, and any cardio/running. Return ONLY the JSON object." }
+          ]
+        }]
+      })
+    });
+    const data = await resp.json();
+    const text = (data.content || []).map(b => b.text || "").join("\n");
+    const clean = text.replace(/```json|```/g, "").trim();
+    return JSON.parse(clean);
+  };
+
+  const handleFiles = (newFiles) => {
+    const pdfs = Array.from(newFiles).filter(f => f.type === "application/pdf" || f.name.endsWith(".pdf"));
+    if (pdfs.length === 0) { notify("Please upload PDF files", "warn"); return; }
+    setFiles(prev => [...prev, ...pdfs]);
+  };
+
+  const removeFile = (idx) => setFiles(files.filter((_, i) => i !== idx));
+
+  const handleParse = async () => {
+    if (files.length === 0) return;
+    setParsing(true);
+    setPreview(null);
+    const results = [];
+    for (let i = 0; i < files.length; i++) {
+      setProgress(`Parsing ${i + 1}/${files.length}: ${files[i].name}...`);
+      try {
+        const parsed = await parsePDF(files[i]);
+        results.push({ file: files[i].name, ...parsed, _ok: true });
+      } catch (e) {
+        console.error("Parse error for", files[i].name, e);
+        results.push({ file: files[i].name, _ok: false, _err: e.message });
+      }
+    }
+    setProgress("");
+    setParsing(false);
+    setPreview(results);
+  };
+
+  const handleImportParsed = () => {
+    if (!preview) return;
+    const nameToId = {};
+    cls.forEach(c => { nameToId[c.name.toLowerCase()] = c.id; });
+    let addedC = 0, addedP = 0;
+    const newCls = [];
+    const newPrs = [];
+
+    preview.filter(r => r._ok).forEach(r => {
+      const c = r.client;
+      if (c && c.name) {
+        const key = c.name.toLowerCase();
+        if (!nameToId[key]) {
+          const cl = { ...c, id: "cl_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6), email: "", phone: "", monthNumber: c.monthNumber || 1 };
+          nameToId[key] = cl.id;
+          newCls.push(cl);
+          addedC++;
+        }
+      }
+      const p = r.program;
+      if (p) {
+        const cName = (r.client?.name || "").toLowerCase();
+        const cId = nameToId[cName] || "unknown";
+        const pr = {
+          ...p,
+          id: "prog_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+          clientId: cId,
+          clientName: r.client?.name || "Unknown",
+          level: r.client?.level || "intermediate",
+          sessionsPerWeek: r.client?.sessionsPerWeek || 3,
+          sessionDuration: r.client?.sessionDuration || 60,
+          trainingLocation: r.client?.trainingLocation || "gym",
+          includesRunning: r.client?.includesRunning || false,
+          cardioDaysPerWeek: r.client?.cardioDaysPerWeek || 0,
+          createdAt: new Date().toISOString(),
+          block1: p.block1 || [],
+          block2: p.block2 && p.block2.length > 0 ? p.block2 : p.block1 || [],
+          cardio: p.cardio || null,
+          running: p.running || null,
+          levelCfg: null,
+          durationCfg: null
+        };
+        newPrs.push(pr);
+        addedP++;
+      }
+    });
+
+    if (newCls.length > 0) {
+      newCls.forEach(c => dbSave("clients", clToDb(c)).catch(console.error));
+      setCls(prev => [...prev, ...newCls]);
+    }
+    if (newPrs.length > 0) {
+      newPrs.forEach(p => dbSave("programs", prToDb(p)).catch(console.error));
+      setPrgs(prev => {
+        const np = { ...prev };
+        newPrs.forEach(p => { if (!np[p.clientId]) np[p.clientId] = []; np[p.clientId].push(p); });
+        return np;
+      });
+    }
+    onClose();
+    notify("Imported " + addedC + " clients, " + addedP + " programs");
+  };
+
+  const handleJsonImport = () => {
+    try {
+      const raw = jsonText.trim();
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      let addedC = 0, addedP = 0;
+      const nameToId = {};
+      cls.forEach(c => { nameToId[c.name.toLowerCase()] = c.id; });
+      if (data.clients && Array.isArray(data.clients)) {
+        const nc = data.clients.map(c => ({ ...c, id: c.id || "cl_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6), email: c.email || "", phone: c.phone || "", monthNumber: c.monthNumber || 1 }));
+        nc.forEach(c => { nameToId[c.name.toLowerCase()] = c.id; dbSave("clients", clToDb(c)).catch(console.error); });
+        setCls(prev => [...prev, ...nc]);
+        addedC = nc.length;
+      }
+      if (data.programs && Array.isArray(data.programs)) {
+        const np = data.programs.map(p => {
+          const cId = p.clientId || nameToId[(p.clientName || "").toLowerCase()] || "unknown";
+          return { ...p, id: p.id || "prog_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6), clientId: cId, createdAt: p.createdAt || new Date().toISOString(), block1: p.block1 || [], block2: p.block2 || [], cardio: p.cardio || null, running: p.running || null, levelCfg: null, durationCfg: null };
+        });
+        np.forEach(p => dbSave("programs", prToDb(p)).catch(console.error));
+        setPrgs(prev => { const ng = { ...prev }; np.forEach(p => { if (!ng[p.clientId]) ng[p.clientId] = []; ng[p.clientId].push(p); }); return ng; });
+        addedP = np.length;
+      }
+      onClose();
+      notify("Imported " + addedC + " clients, " + addedP + " programs");
+    } catch (e) { notify("Invalid JSON: " + e.message, "warn"); }
+  };
+
+  const tabStyle = (active) => ({ padding: "10px 20px", border: "none", borderBottom: active ? "2px solid " + K.ac : "2px solid transparent", background: "transparent", color: active ? K.ac : K.tm, fontFamily: ff, fontSize: 13, fontWeight: 600, cursor: "pointer" });
+  const dropZone = { border: "2px dashed " + (dragOver ? K.ac : K.bd), borderRadius: 12, padding: 40, textAlign: "center", background: dragOver ? K.ac + "08" : K.bg, transition: "all 0.2s", cursor: "pointer" };
+
+  return (
+    <Mdl title="Import" onClose={onClose} wide>
+      <div style={{ display: "flex", borderBottom: "1px solid " + K.bd, marginBottom: 20 }}>
+        <button onClick={() => setTab("pdf")} style={tabStyle(tab === "pdf")}>📄 Upload PDF</button>
+        <button onClick={() => setTab("json")} style={tabStyle(tab === "json")}>📋 Paste JSON</button>
+      </div>
+
+      {tab === "pdf" && (
+        <div>
+          <p style={{ color: K.tm, fontSize: 13, marginBottom: 16 }}>Upload your training program PDFs. Claude AI will automatically extract exercises, sets, reps, weights, and structure.</p>
+
+          {!preview && (
+            <>
+              <div style={dropZone}
+                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+                onClick={() => document.getElementById("pdfInput").click()}
+              >
+                <div style={{ color: K.ac, marginBottom: 8 }}>{I.upload}</div>
+                <div style={{ color: K.tx, fontWeight: 600, fontSize: 14, marginBottom: 4 }}>Drop PDFs here or click to browse</div>
+                <div style={{ color: K.td, fontSize: 12 }}>Supports multiple files</div>
+                <input id="pdfInput" type="file" accept=".pdf" multiple style={{ display: "none" }} onChange={e => handleFiles(e.target.files)} />
+              </div>
+
+              {files.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: K.tm, marginBottom: 8, textTransform: "uppercase" }}>{files.length} file{files.length > 1 ? "s" : ""} selected</div>
+                  {files.map((f, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", background: K.bg, borderRadius: 8, marginBottom: 6, border: "1px solid " + K.bd }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ color: K.dg, fontSize: 18 }}>📄</span>
+                        <div>
+                          <div style={{ fontSize: 13, color: K.tx, fontWeight: 500 }}>{f.name}</div>
+                          <div style={{ fontSize: 11, color: K.td }}>{(f.size / 1024).toFixed(0)} KB</div>
+                        </div>
+                      </div>
+                      <button onClick={() => removeFile(i)} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", fontSize: 16 }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {parsing && (
+                <div style={{ marginTop: 16, padding: 16, background: K.ab, borderRadius: 10, border: "1px solid " + K.ac + "30" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 20, height: 20, border: "2px solid " + K.ac, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                    <span style={{ color: K.ac, fontSize: 13, fontWeight: 600 }}>{progress}</span>
+                  </div>
+                  <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+                <Btn v="secondary" onClick={onClose}>Cancel</Btn>
+                <Btn onClick={handleParse} disabled={files.length === 0 || parsing} icon={I.bolt}>{parsing ? "Parsing..." : "Parse with AI"}</Btn>
+              </div>
+            </>
+          )}
+
+          {preview && (
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: K.tm, marginBottom: 12, textTransform: "uppercase" }}>Parsed Results</div>
+              {preview.map((r, i) => (
+                <div key={i} style={{ padding: 14, background: r._ok ? K.bg : "#2a1010", borderRadius: 10, marginBottom: 10, border: "1px solid " + (r._ok ? K.bd : K.dg + "50") }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: r._ok ? 8 : 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: r._ok ? K.tx : K.dg }}>{r.file}</div>
+                    <Badge color={r._ok ? K.ok : K.dg}>{r._ok ? "✓ Parsed" : "✗ Failed"}</Badge>
+                  </div>
+                  {r._ok && (
+                    <div style={{ fontSize: 12, color: K.td, lineHeight: 1.8 }}>
+                      <div><span style={{ color: K.tm }}>Client:</span> {r.client?.name || "Unknown"} · <span style={{ color: K.tm }}>Level:</span> {r.client?.level}</div>
+                      <div><span style={{ color: K.tm }}>Sessions:</span> {r.client?.sessionsPerWeek}×/wk · {r.client?.sessionDuration}min</div>
+                      <div><span style={{ color: K.tm }}>Block 1:</span> {(r.program?.block1 || []).length} days · {(r.program?.block1 || []).reduce((a, d) => a + (d.exercises?.length || 0), 0)} exercises</div>
+                      {(r.program?.block2 || []).length > 0 && <div><span style={{ color: K.tm }}>Block 2:</span> {r.program.block2.length} days · {r.program.block2.reduce((a, d) => a + (d.exercises?.length || 0), 0)} exercises</div>}
+                      {r.program?.cardio && <div><span style={{ color: K.tm }}>Cardio:</span> Included</div>}
+                      {r.program?.running && <div><span style={{ color: K.tm }}>Running:</span> Included</div>}
+                    </div>
+                  )}
+                  {!r._ok && <div style={{ fontSize: 12, color: K.dg, marginTop: 6 }}>{r._err}</div>}
+                </div>
+              ))}
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+                <Btn v="secondary" onClick={() => { setPreview(null); setFiles([]); }}>Back</Btn>
+                <Btn onClick={handleImportParsed} disabled={!preview.some(r => r._ok)} icon={I.check}>Import {preview.filter(r => r._ok).length} Program{preview.filter(r => r._ok).length !== 1 ? "s" : ""}</Btn>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "json" && (
+        <div>
+          <p style={{ color: K.tm, fontSize: 13, marginBottom: 12 }}>Paste JSON data to import clients and/or programs:</p>
+          <textarea value={jsonText} onChange={e => setJsonText(e.target.value)} placeholder='{"clients": [...], "programs": [...]}' style={{ width: "100%", minHeight: 220, padding: 14, background: K.bg, border: "1px solid " + K.bd, borderRadius: 8, color: K.tx, fontSize: 12, fontFamily: mf, resize: "vertical", outline: "none", boxSizing: "border-box" }} />
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
+            <Btn v="secondary" onClick={onClose}>Cancel</Btn>
+            <Btn onClick={handleJsonImport} disabled={!jsonText.trim()}>Import JSON</Btn>
+          </div>
+        </div>
+      )}
+    </Mdl>
+  );
+}
 
 // ─── HISTORY HELPERS ───
 function getLatest(prgs, cId) { const a = prgs[cId]; return a && a.length > 0 ? a[a.length - 1] : null; }
@@ -925,6 +1256,9 @@ export default function App() {
   const [selPr, setSelPr] = useState(null);
   const [showCM, setShowCM] = useState(false);
   const [editCl, setEditCl] = useState(null);
+  const [confDel, setConfDel] = useState(null);
+  const [confDelPr, setConfDelPr] = useState(null);
+  const [showImport, setShowImport] = useState(false);
   const [sq, setSq] = useState("");
   const [ntf, setNtf] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1230,7 +1564,7 @@ export default function App() {
       <div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}><button onClick={onBack} style={{ background: "none", border: "none", color: K.tm, cursor: "pointer", padding: 4 }}>{I.back}</button><div><h2 style={{ margin: 0, fontSize: 20, color: K.tx }}>{p.clientName}</h2><div style={{ fontSize: 12, color: K.tm, display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>Month {p.monthNumber} · <LvlBadge level={p.level} /><span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>{I.cal} {p.sessionsPerWeek}×/wk</span><span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>{I.clock} {p.sessionDuration}min</span>{p.trainingLocation === "home" && <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: "rgba(200,255,46,0.15)", color: K.ac }}>🏠 HOME</span>}{p.cardioDaysPerWeek > 0 && <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: "rgba(46,204,113,0.15)", color: "#2ecc71" }}>+{p.cardioDaysPerWeek} Cardio</span>}</div></div></div>
-          <div style={{ display: "flex", gap: 10 }}><Btn v="secondary" sm onClick={() => exportPDF(p)} icon={pdfIcon}>PDF</Btn><Btn v="secondary" sm onClick={() => { setP(JSON.parse(JSON.stringify(program))); notify("Reset", "warn"); }} icon={I.refresh}>Reset</Btn><Btn sm onClick={() => { onSave(p); notify("Saved!"); }}>Save</Btn></div>
+          <div style={{ display: "flex", gap: 10 }}><Btn v="secondary" sm onClick={() => exportPDF(p)} icon={pdfIcon}>PDF</Btn><Btn v="secondary" sm onClick={() => { setP(JSON.parse(JSON.stringify(program))); notify("Reset", "warn"); }} icon={I.refresh}>Reset</Btn><Btn v="danger" sm onClick={() => setConfDelPr(p)} icon={I.trash}>Delete</Btn><Btn sm onClick={() => { onSave(p); notify("Saved!"); }}>Save</Btn></div>
         </div>
         <div style={{ display: "flex", gap: 2, marginBottom: 16, background: K.sf, borderRadius: 10, padding: 3 }}>{["Block 1 — Weeks 1-2", "Block 2 — Weeks 3-4"].map((l, i) => <button key={i} onClick={() => { setAb(i); setAd(0); }} style={{ flex: 1, padding: "10px 16px", border: "none", borderRadius: 8, fontFamily: ff, fontSize: 13, fontWeight: 600, cursor: "pointer", background: ab === i ? K.ac : "transparent", color: ab === i ? "#0a0a0c" : K.tm }}>{l}</button>)}</div>
         <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>{cb.map((d, i) => <button key={i} onClick={() => setAd(i)} style={{ padding: "8px 16px", border: "1px solid " + (ad === i ? K.ac : K.bd), borderRadius: 8, fontFamily: ff, fontSize: 12, fontWeight: 600, cursor: "pointer", background: ad === i ? K.ab : "transparent", color: ad === i ? K.ac : K.tm }}>{d.dayLabel} · {d.focus}</button>)}</div>
@@ -1321,6 +1655,7 @@ export default function App() {
             {cp && <Btn v="secondary" onClick={() => exportPDF(cp)} icon={pdfIcon}>Export PDF</Btn>}
             {allP.length > 0 && <Btn v="secondary" onClick={() => setHistCl(c)} icon={I.history}>History ({allP.length})</Btn>}
             <Btn v="secondary" onClick={() => { setEditCl(c); setShowCM(true); }} icon={I.edit}>Edit Client</Btn>
+            <Btn v="danger" onClick={() => setConfDel(c)} icon={I.trash}>Delete Client</Btn>
           </div>
           {cp && <Crd style={{ marginBottom: 16 }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><h4 style={{ margin: 0, fontSize: 14, color: K.tx }}>Current Program — Month {cp.monthNumber}</h4><span style={{ fontSize: 11, color: K.td }}>{new Date(cp.createdAt).toLocaleDateString()}</span></div><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>{["Block 1 (Wk 1-2)", "Block 2 (Wk 3-4)"].map((l, bi) => <div key={bi} style={{ background: K.bg, borderRadius: 8, padding: 14 }}><div style={{ fontSize: 12, fontWeight: 600, color: K.ac, marginBottom: 10 }}>{l}</div>{(bi === 0 ? cp.block1 : cp.block2).map((d, di) => <div key={di} style={{ marginBottom: 8 }}><div style={{ fontSize: 12, fontWeight: 600, color: K.tx }}>{d.dayLabel}: {d.focus}</div><div style={{ fontSize: 11, color: K.td }}>{d.exercises.length} exercises</div></div>)}</div>)}</div></Crd>}
           {allP.length > 1 && <Crd><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><h4 style={{ margin: 0, fontSize: 14, color: K.tx }}>Program Timeline</h4><Btn v="ghost" sm onClick={() => setHistCl(c)} icon={I.history}>View All</Btn></div><div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>{allP.map((prog, i) => { const isLast = i === allP.length - 1; return <div key={prog.id} onClick={() => setSelPr(prog)} style={{ minWidth: 120, padding: "10px 14px", borderRadius: 8, background: isLast ? K.ab : K.bg, border: "1px solid " + (isLast ? K.ac + "50" : K.bd), cursor: "pointer", textAlign: "center", flexShrink: 0 }}><div style={{ fontSize: 18, fontWeight: 700, color: isLast ? K.ac : K.tx, fontFamily: mf }}>{prog.monthNumber}</div><div style={{ fontSize: 10, color: K.td, marginTop: 2 }}>Month</div><div style={{ fontSize: 10, color: K.tm, marginTop: 4 }}>{new Date(prog.createdAt).toLocaleDateString("it-IT", { day: "numeric", month: "short" })}</div></div>; })}</div></Crd>}
@@ -1329,9 +1664,9 @@ export default function App() {
     }
     return (
       <div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}><div><h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: K.tx }}>Clients</h1><p style={{ margin: "6px 0 0", color: K.tm, fontSize: 14 }}>{actCls.length} active</p></div><Btn onClick={() => { setEditCl(null); setShowCM(true); }} icon={I.plus}>New Client</Btn></div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}><div><h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: K.tx }}>Clients</h1><p style={{ margin: "6px 0 0", color: K.tm, fontSize: 14 }}>{actCls.length} active</p></div><div style={{ display: "flex", gap: 10 }}><Btn v="secondary" onClick={() => setShowImport(true)} icon={I.upload}>Import</Btn><Btn onClick={() => { setEditCl(null); setShowCM(true); }} icon={I.plus}>New Client</Btn></div></div>
         <div style={{ position: "relative", marginBottom: 20 }}><input value={sq} onChange={e => setSq(e.target.value)} placeholder="Search..." style={{ width: "100%", padding: "12px 16px 12px 40px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 10, color: K.tx, fontSize: 14, fontFamily: ff, outline: "none", boxSizing: "border-box" }} /><div style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: K.td }}>{I.search}</div></div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>{fl.map(c => { const lp = getLatest(prgs, c.id); const pc = getAll(prgs, c.id).length; return <Crd key={c.id} onClick={() => setSelCl(c)} style={{ cursor: "pointer", borderLeft: "3px solid " + (lp ? K.ac : K.bd) }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}><div><div style={{ fontWeight: 600, color: K.tx, fontSize: 15, marginBottom: 6 }}>{c.name}</div><div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}><LvlBadge level={c.level} /><span style={{ fontSize: 12, color: K.tm }}>Mo.{c.monthNumber} · {c.sessionsPerWeek}×/wk · {c.sessionDuration}min</span>{c.trainingLocation === "home" && <Badge color={K.ac}>🏠 Home</Badge>}{(c.cardioDaysPerWeek || 0) > 0 && <Badge color="#2ecc71">+{c.cardioDaysPerWeek} Cardio</Badge>}</div><div style={{ fontSize: 12, color: K.td }}>{c.goals}</div></div><div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>{lp ? <Badge color={K.ac}>Mo.{lp.monthNumber} ✓</Badge> : <Badge color={K.wn}>Pending</Badge>}{pc > 1 && <span style={{ fontSize: 10, color: K.td }}>{pc} programs</span>}<div style={{ color: K.td }}>{I.chevron}</div></div></div></Crd>; })}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>{fl.map(c => { const lp = getLatest(prgs, c.id); const pc = getAll(prgs, c.id).length; return <Crd key={c.id} onClick={() => setSelCl(c)} style={{ cursor: "pointer", borderLeft: "3px solid " + (lp ? K.ac : K.bd) }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}><div><div style={{ fontWeight: 600, color: K.tx, fontSize: 15, marginBottom: 6 }}>{c.name}</div><div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}><LvlBadge level={c.level} /><span style={{ fontSize: 12, color: K.tm }}>Mo.{c.monthNumber} · {c.sessionsPerWeek}×/wk · {c.sessionDuration}min</span>{c.trainingLocation === "home" && <Badge color={K.ac}>🏠 Home</Badge>}{(c.cardioDaysPerWeek || 0) > 0 && <Badge color="#2ecc71">+{c.cardioDaysPerWeek} Cardio</Badge>}</div><div style={{ fontSize: 12, color: K.td }}>{c.goals}</div></div><div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>{lp ? <Badge color={K.ac}>Mo.{lp.monthNumber} ✓</Badge> : <Badge color={K.wn}>Pending</Badge>}{pc > 1 && <span style={{ fontSize: 10, color: K.td }}>{pc} programs</span>}<div style={{ display: "flex", alignItems: "center", gap: 8 }}><button onClick={e => { e.stopPropagation(); setConfDel(c); }} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 4, borderRadius: 4, display: "flex", alignItems: "center" }} title="Delete">{I.trash}</button><div style={{ color: K.td }}>{I.chevron}</div></div></div></div></Crd>; })}</div>
       </div>
     );
   }
@@ -1368,6 +1703,9 @@ export default function App() {
       </nav>
       <main style={{ flex: 1, padding: "28px 36px", overflowY: "auto", maxHeight: "100vh" }}>{pg === "dashboard" && <Dash />}{pg === "clients" && <Clients />}{pg === "programs" && <Programs />}{pg === "library" && <Library />}</main>
       {showCM && <ClForm client={editCl} onClose={() => { setShowCM(false); setEditCl(null); }} onSave={c => { if (editCl) { setCls(cls.map(x => x.id === c.id ? c : x)); if (selCl?.id === c.id) setSelCl(c); } else setCls([...cls, c]); dbSave("clients", clToDb(c)).catch(console.error); setShowCM(false); setEditCl(null); notify(editCl ? "Updated!" : "Added!"); }} />}
+      {confDel && <Mdl title="Delete Client" onClose={() => setConfDel(null)}><p style={{ color: K.tm, fontSize: 14, marginBottom: 8 }}>Are you sure you want to delete <strong style={{ color: K.tx }}>{confDel.name}</strong>?</p><p style={{ color: K.dg, fontSize: 13, marginBottom: 20 }}>This will also delete all {(getAll(prgs, confDel.id) || []).length} associated programs. This action cannot be undone.</p><div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}><Btn v="secondary" onClick={() => setConfDel(null)}>Cancel</Btn><Btn v="danger" onClick={() => { const cId = confDel.id; dbDelete("clients", cId).catch(console.error); (getAll(prgs, cId) || []).forEach(p => dbDelete("programs", p.id).catch(console.error)); setCls(cls.filter(c => c.id !== cId)); const np = { ...prgs }; delete np[cId]; setPrgs(np); if (selCl?.id === cId) { setSelCl(null); setSelPr(null); } setConfDel(null); notify("Client deleted", "warn"); }}>Delete</Btn></div></Mdl>}
+      {confDelPr && <Mdl title="Delete Program" onClose={() => setConfDelPr(null)}><p style={{ color: K.tm, fontSize: 14, marginBottom: 8 }}>Delete <strong style={{ color: K.tx }}>{confDelPr.clientName} — Month {confDelPr.monthNumber}</strong>?</p><p style={{ color: K.dg, fontSize: 13, marginBottom: 20 }}>This action cannot be undone.</p><div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}><Btn v="secondary" onClick={() => setConfDelPr(null)}>Cancel</Btn><Btn v="danger" onClick={() => { const p = confDelPr; dbDelete("programs", p.id).catch(console.error); const np = { ...prgs, [p.clientId]: (prgs[p.clientId] || []).filter(x => x.id !== p.id) }; if (np[p.clientId].length === 0) delete np[p.clientId]; setPrgs(np); if (selPr?.id === p.id) setSelPr(null); setConfDelPr(null); notify("Program deleted", "warn"); }}>Delete</Btn></div></Mdl>}
+      {showImport && <ImportModal cls={cls} setCls={setCls} prgs={prgs} setPrgs={setPrgs} onClose={() => setShowImport(false)} notify={notify} dbSave={dbSave} clToDb={clToDb} prToDb={prToDb} />}
       {ntf && <div style={{ position: "fixed", bottom: 24, right: 24, padding: "12px 20px", borderRadius: 10, background: ntf.t === "warn" ? "#332800" : "#0a2e12", border: "1px solid " + (ntf.t === "warn" ? K.wn : K.ok) + "30", color: ntf.t === "warn" ? K.wn : K.ok, fontSize: 13, fontWeight: 600, fontFamily: ff, display: "flex", alignItems: "center", gap: 8, zIndex: 2000, animation: "slideUp 0.3s ease" }}>{I.check} {ntf.m}</div>}
       <style>{`@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}*{box-sizing:border-box}::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:${K.bg}}::-webkit-scrollbar-thumb{background:${K.bd};border-radius:3px}select option{background:${K.sf};color:${K.tx}}input:focus,select:focus,textarea:focus{border-color:${K.ac}!important}`}</style>
     </div>
