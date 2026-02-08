@@ -338,12 +338,8 @@ const I = {
 
 // ─── SAMPLE DATA ───
 const SAMPLE_CLIENTS = [
-  { id: "cl1", name: "Sofia Marchetti", email: "sofia@email.com", phone: "+39 333 1234567", level: "beginner", monthNumber: 1, sessionsPerWeek: 3, sessionDuration: 60, day3Type: "glute", trainingLocation: "gym", cardioDaysPerWeek: 0, goals: "General fitness, weight loss", healthNotes: "None", injuries: [], includesRunning: true, startDate: "2026-01-06", status: "active" },
-  { id: "cl2", name: "Elena Rossi", email: "elena@email.com", phone: "+39 340 9876543", level: "intermediate", monthNumber: 3, sessionsPerWeek: 4, sessionDuration: 75, day3Type: "glute", trainingLocation: "gym", cardioDaysPerWeek: 0, goals: "Strength, muscle tone", healthNotes: "Mild lower back sensitivity", injuries: ["lower back"], includesRunning: false, startDate: "2025-10-15", status: "active" },
-  { id: "cl3", name: "Giulia Bianchi", email: "giulia@email.com", phone: "+39 348 5551234", level: "advanced", monthNumber: 6, sessionsPerWeek: 5, sessionDuration: 90, day3Type: "fullbody", trainingLocation: "gym", cardioDaysPerWeek: 0, goals: "Powerlifting competition prep", healthNotes: "Previous ACL surgery (2023), fully recovered", injuries: [], includesRunning: false, startDate: "2025-08-01", status: "active" },
-  { id: "cl4", name: "Marta Conti", email: "marta@email.com", phone: "+39 345 7778899", level: "beginner", monthNumber: 2, sessionsPerWeek: 2, sessionDuration: 45, day3Type: "glute", trainingLocation: "gym", cardioDaysPerWeek: 0, goals: "Post-pregnancy recovery, core strength", healthNotes: "6 months postpartum, diastasis recti", injuries: [], includesRunning: false, startDate: "2025-12-01", status: "active" },
-  { id: "cl5", name: "Redini", email: "redini@email.com", phone: "", level: "intermediate", monthNumber: 3, sessionsPerWeek: 3, sessionDuration: 75, day3Type: "glute", trainingLocation: "gym", cardioDaysPerWeek: 0, goals: "Strength, pull-up progression, glute development", healthNotes: "None", injuries: [], includesRunning: false, startDate: "2025-09-01", status: "active" },
-  { id: "cl6", name: "Benvenuti", email: "benvenuti@email.com", phone: "", level: "intermediate", monthNumber: 3, sessionsPerWeek: 3, sessionDuration: 60, day3Type: "fullbody", trainingLocation: "home", cardioDaysPerWeek: 3, goals: "General fitness, improve running, body recomposition", healthNotes: "None", injuries: [], includesRunning: false, startDate: "2025-10-01", status: "active" },
+  { id: "cl5", name: "Redini", email: "", phone: "", level: "intermediate", monthNumber: 3, sessionsPerWeek: 3, sessionDuration: 75, day3Type: "glute", trainingLocation: "gym", cardioDaysPerWeek: 0, goals: "Strength, pull-up progression, glute development", healthNotes: "", injuries: [], includesRunning: false, startDate: "2025-09-01", status: "active" },
+  { id: "cl6", name: "Benvenuti", email: "", phone: "", level: "intermediate", monthNumber: 3, sessionsPerWeek: 3, sessionDuration: 60, day3Type: "fullbody", trainingLocation: "home", cardioDaysPerWeek: 3, goals: "General fitness, improve running, body recomposition", healthNotes: "", injuries: [], includesRunning: false, startDate: "2025-10-01", status: "active" },
   { id: "cl7", name: "Cardoni", email: "", phone: "", level: "intermediate", monthNumber: 3, sessionsPerWeek: 4, sessionDuration: 75, day3Type: "fullbody", trainingLocation: "gym", cardioDaysPerWeek: 1, goals: "Strength, pull-up progression, running", healthNotes: "", injuries: [], includesRunning: true, startDate: "2025-07-01", status: "active" },
   { id: "cl8", name: "Adamoli", email: "", phone: "", level: "intermediate", monthNumber: 1, sessionsPerWeek: 3, sessionDuration: 70, day3Type: "fullbody", trainingLocation: "gym", cardioDaysPerWeek: 0, goals: "Strength, conditioning", healthNotes: "", injuries: [], includesRunning: false, startDate: "2025-11-01", status: "active" },
   { id: "cl9", name: "Agrati", email: "", phone: "", level: "beginner", monthNumber: 2, sessionsPerWeek: 4, sessionDuration: 60, day3Type: "fullbody", trainingLocation: "gym", cardioDaysPerWeek: 1, goals: "General fitness, running", healthNotes: "", injuries: [], includesRunning: true, startDate: "2025-09-01", status: "active" },
@@ -938,21 +934,50 @@ export default function App() {
     (async () => {
       try {
         let clients = await dbLoad("clients");
-        let programs = await dbLoad("programs");
-        // Seed if DB is empty
-        if (!Array.isArray(clients) || clients.length === 0) {
+        if (!Array.isArray(clients)) clients = [];
+        
+        // Remove fake/old clients (cl1-cl4) if present
+        const fakeIds = ["cl1","cl2","cl3","cl4"];
+        const hasOld = clients.some(c => fakeIds.includes(c.id));
+        if (hasOld) {
+          for (const fid of fakeIds) {
+            await supaFetch(`clients?id=eq.${fid}`, { method: "DELETE" });
+          }
+          clients = clients.filter(c => !fakeIds.includes(c.id));
+        }
+        
+        // Seed all real clients if DB was empty or sync missing ones
+        if (clients.length === 0) {
           await dbSave("clients", SAMPLE_CLIENTS.map(clToDb));
           clients = SAMPLE_CLIENTS;
         } else {
           clients = clients.map(clFromDb);
+          const existIds = new Set(clients.map(c => c.id));
+          const missing = SAMPLE_CLIENTS.filter(c => !existIds.has(c.id));
+          if (missing.length > 0) {
+            await dbSave("clients", missing.map(clToDb));
+            clients = [...clients, ...missing];
+          }
         }
-        if (!Array.isArray(programs) || programs.length === 0) {
+
+        let programs = await dbLoad("programs");
+        if (!Array.isArray(programs)) programs = [];
+        if (programs.length === 0) {
           const allProgs = Object.values(INITIAL_PRGS).flat();
           await dbSave("programs", allProgs.map(prToDb));
           programs = allProgs;
         } else {
           programs = programs.map(prFromDb);
+          // Sync missing programs
+          const existPIds = new Set(programs.map(p => p.id));
+          const allInit = Object.values(INITIAL_PRGS).flat();
+          const missingP = allInit.filter(p => !existPIds.has(p.id));
+          if (missingP.length > 0) {
+            await dbSave("programs", missingP.map(prToDb));
+            programs = [...programs, ...missingP];
+          }
         }
+
         setCls(clients);
         const grouped = {};
         programs.forEach(p => { if (!grouped[p.clientId]) grouped[p.clientId] = []; grouped[p.clientId].push(p); });
