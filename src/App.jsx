@@ -473,8 +473,39 @@ RULES:
 
   const handleFiles = (newFiles) => {
     const pdfs = Array.from(newFiles).filter(f => f.type === "application/pdf" || f.name.endsWith(".pdf"));
-    if (pdfs.length === 0) { notify("Please upload PDF files", "warn"); return; }
+    if (pdfs.length === 0) { notify("No PDF files found", "warn"); return; }
     setFiles(prev => [...prev, ...pdfs]);
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const items = e.dataTransfer.items;
+    if (!items) { handleFiles(e.dataTransfer.files); return; }
+    const allFiles = [];
+    const readEntry = (entry) => new Promise((resolve) => {
+      if (entry.isFile) {
+        entry.file(f => { if (f.type === "application/pdf" || f.name.endsWith(".pdf")) allFiles.push(f); resolve(); }, () => resolve());
+      } else if (entry.isDirectory) {
+        const reader = entry.createReader();
+        reader.readEntries(async (entries) => {
+          for (const e of entries) await readEntry(e);
+          resolve();
+        }, () => resolve());
+      } else { resolve(); }
+    });
+    const entries = [];
+    for (let i = 0; i < items.length; i++) {
+      const entry = items[i].webkitGetAsEntry && items[i].webkitGetAsEntry();
+      if (entry) entries.push(entry);
+    }
+    if (entries.length > 0) {
+      for (const entry of entries) await readEntry(entry);
+      if (allFiles.length === 0) { notify("No PDF files found in folder", "warn"); return; }
+      setFiles(prev => [...prev, ...allFiles]);
+    } else {
+      handleFiles(e.dataTransfer.files);
+    }
   };
 
   const removeFile = (idx) => setFiles(files.filter((_, i) => i !== idx));
@@ -609,13 +640,17 @@ RULES:
               <div style={dropZone}
                 onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={() => setDragOver(false)}
-                onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
-                onClick={() => document.getElementById("pdfInput").click()}
+                onDrop={handleDrop}
               >
                 <div style={{ color: K.ac, marginBottom: 8 }}>{I.upload}</div>
-                <div style={{ color: K.tx, fontWeight: 600, fontSize: 14, marginBottom: 4 }}>Drop PDFs here or click to browse</div>
-                <div style={{ color: K.td, fontSize: 12 }}>Supports multiple files</div>
+                <div style={{ color: K.tx, fontWeight: 600, fontSize: 14, marginBottom: 4 }}>Drop PDFs or a folder here</div>
+                <div style={{ color: K.td, fontSize: 12, marginBottom: 14 }}>Or use the buttons below</div>
+                <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+                  <button onClick={() => document.getElementById("pdfInput").click()} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid " + K.bd, background: K.sf, color: K.tx, fontFamily: ff, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>📄 Select Files</button>
+                  <button onClick={() => document.getElementById("pdfFolderInput").click()} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid " + K.ac, background: K.ab, color: K.ac, fontFamily: ff, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>📁 Select Folder</button>
+                </div>
                 <input id="pdfInput" type="file" accept=".pdf" multiple style={{ display: "none" }} onChange={e => handleFiles(e.target.files)} />
+                <input id="pdfFolderInput" type="file" accept=".pdf" multiple webkitdirectory="" directory="" style={{ display: "none" }} onChange={e => handleFiles(e.target.files)} />
               </div>
 
               {files.length > 0 && (
