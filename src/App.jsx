@@ -457,26 +457,18 @@ RULES:
 
   const parsePDF = async (file) => {
     const b64 = await toBase64(file);
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    const resp = await fetch("/api/parse-pdf", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 8000,
-        system: PARSE_PROMPT,
-        messages: [{
-          role: "user",
-          content: [
-            { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } },
-            { type: "text", text: "Parse this training program PDF. The filename is: " + file.name + ". Extract all exercises, sets, reps, weights, rest periods, and any cardio/running. Return ONLY the JSON object." }
-          ]
-        }]
-      })
+      body: JSON.stringify({ pdfBase64: b64, fileName: file.name })
     });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: "Network error" }));
+      throw new Error(err.error || "API error " + resp.status);
+    }
     const data = await resp.json();
-    const text = (data.content || []).map(b => b.text || "").join("\n");
-    const clean = text.replace(/```json|```/g, "").trim();
-    return JSON.parse(clean);
+    if (data.parseError) throw new Error("Parse error: " + data.parseError + "\nRaw: " + (data.raw || "").substring(0, 200));
+    return data;
   };
 
   const handleFiles = (newFiles) => {
