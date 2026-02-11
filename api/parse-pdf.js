@@ -45,7 +45,7 @@ export default async function handler(req, res) {
             "id": "unique_id",
             "name": "Exercise Name (keep original language, e.g. Italian)",
             "category": "compound|isolation|core|mobility|hiit",
-            "section": "Strength|Accessories|Core|Finisher|Warm-Up",
+            "section": "Strength|Core|Finisher|Warm-Up",
             "sets": 4,
             "reps": "8",
             "rest": 120,
@@ -65,7 +65,7 @@ export default async function handler(req, res) {
 RULES:
 - "block1" = weeks 1-2 (or first half), "block2" = weeks 3-4 (or second half). If only one block exists, put it in block1 and leave block2 as empty copy or same.
 - dayType: Q=quad/push, H=hinge/pull, G=glute, F=fullbody
-- section: group exercises by Strength (main lifts), Accessories (secondary), Core (abs/stability), Finisher (EMOM/AMRAP/circuits), Warm-Up
+- section: group exercises by Strength (all main lifts and accessory work), Core (abs/stability), Finisher (EMOM/AMRAP/circuits), Warm-Up
 - Keep exercise names in their ORIGINAL language (Italian, English, etc.)
 - For supersets, put both exercises as separate entries with notes "Superset with X"
 - For circuits/EMOM/AMRAP, put as single exercise in Finisher section with full description in notes
