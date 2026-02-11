@@ -191,122 +191,276 @@ const DURATION_CONFIG = {
   75: { mobilityCount: 4, compoundCount: 2, accessoryCount: 3, coreCount: 2, hiitCount: 3, hiitRounds: 3 },
   90: { mobilityCount: 4, compoundCount: 2, accessoryCount: 4, coreCount: 2, hiitCount: 4, hiitRounds: 4 },
 };
+
+// ─── PROGRESSION ENGINE ───
+
+// Legacy config for historical programs
 const LEVEL_CONFIG = {
-  beginner: {
-    months1_2: { compoundSets: 3, compoundReps: "10-12", compoundRPE: "6", accessorySets: 2, accessoryReps: "12-15", accessoryRPE: "5-6", coreSets: 2, coreReps: "10-12", restCompound: 120, restAccessory: 90 },
-    months3_4: { compoundSets: 3, compoundReps: "8-10", compoundRPE: "7", accessorySets: 3, accessoryReps: "10-12", accessoryRPE: "6-7", coreSets: 3, coreReps: "10-12", restCompound: 120, restAccessory: 75 },
-  },
-  intermediate: {
-    month1: { compoundSets: 4, compoundReps: "6-8", compoundRPE: "7", accessorySets: 3, accessoryReps: "8-12", accessoryRPE: "7", coreSets: 3, coreReps: "10-15", restCompound: 150, restAccessory: 75 },
-    following: { compoundSets: 4, compoundReps: "4-6", compoundRPE: "8-9", accessorySets: 4, accessoryReps: "8-10", accessoryRPE: "8", coreSets: 3, coreReps: "12-15", restCompound: 180, restAccessory: 60 },
-  },
+  beginner: { months1_2: { compoundSets: 3, compoundReps: "10-12", compoundRPE: "6", accessorySets: 2, accessoryReps: "12-15", accessoryRPE: "5-6", coreSets: 2, coreReps: "10-12", restCompound: 120, restAccessory: 90 }, months3_4: { compoundSets: 3, compoundReps: "8-10", compoundRPE: "7", accessorySets: 3, accessoryReps: "10-12", accessoryRPE: "6-7", coreSets: 3, coreReps: "10-12", restCompound: 120, restAccessory: 75 } },
+  intermediate: { month1: { compoundSets: 4, compoundReps: "6-8", compoundRPE: "7", accessorySets: 3, accessoryReps: "8-12", accessoryRPE: "7", coreSets: 3, coreReps: "10-15", restCompound: 150, restAccessory: 75 }, following: { compoundSets: 4, compoundReps: "4-6", compoundRPE: "8-9", accessorySets: 4, accessoryReps: "8-10", accessoryRPE: "8", coreSets: 3, coreReps: "12-15", restCompound: 180, restAccessory: 60 } },
   advanced: { base: { compoundSets: 5, compoundReps: "3-5", compoundRPE: "8-9", accessorySets: 4, accessoryReps: "6-10", accessoryRPE: "8-9", coreSets: 3, coreReps: "12-15", restCompound: 180, restAccessory: 60 } },
 };
 
-function getLevelConfig(level, monthNumber) {
-  if (level === "beginner") return monthNumber <= 2 ? LEVEL_CONFIG.beginner.months1_2 : LEVEL_CONFIG.beginner.months3_4;
-  if (level === "intermediate") return monthNumber <= 1 ? LEVEL_CONFIG.intermediate.month1 : LEVEL_CONFIG.intermediate.following;
-  return LEVEL_CONFIG.advanced.base;
+// Parse weight string → number in kg (returns null if unparseable)
+function parseWeight(w) {
+  if (!w || w === "—" || w === "BW" || w === "bodyweight") return null;
+  const s = String(w).toLowerCase().replace(/,/g, ".").replace(/\s+/g, "");
+  // Handle "2x10kg" → 10, "2×12.5kg" → 12.5
+  let m = s.match(/(\d+)\s*[x×]\s*(\d+\.?\d*)\s*kg/);
+  if (m) return { perSide: true, value: parseFloat(m[2]) };
+  // Handle "60kg", "60-65kg", "@60%"
+  m = s.match(/(\d+\.?\d*)\s*kg/);
+  if (m) return { perSide: false, value: parseFloat(m[1]) };
+  // Handle ranges "30-35kg"
+  m = s.match(/(\d+\.?\d*)\s*[-–]\s*(\d+\.?\d*)\s*kg/);
+  if (m) return { perSide: false, value: parseFloat(m[2]) };
+  // Handle "+30kg" (weighted)
+  m = s.match(/\+\s*(\d+\.?\d*)\s*kg/);
+  if (m) return { perSide: false, value: parseFloat(m[1]) };
+  // Handle percentage "@65%"
+  m = s.match(/@?\s*(\d+\.?\d*)\s*%/);
+  if (m) return { perSide: false, value: parseFloat(m[1]), isPercent: true };
+  // Handle RPE in weight field "RPE 7"
+  m = s.match(/rpe\s*(\d+\.?\d*)/i);
+  if (m) return null;
+  return null;
 }
+
+// Format weight back to string
+function formatWeight(parsed, original) {
+  if (!parsed) return original || "—";
+  const v = parsed.value;
+  if (parsed.isPercent) return "@" + Math.round(v) + "%";
+  if (parsed.perSide) return "2×" + (v % 1 === 0 ? v : v.toFixed(1)) + "kg";
+  return (v % 1 === 0 ? v : v.toFixed(1)) + "kg";
+}
+
+// Determine training phase based on month number
+function getPhase(monthNumber) {
+  const cycle = ((monthNumber - 1) % 4); // 0-indexed in 4-month cycles
+  if (cycle === 0) return "foundation";    // Mo 1,5,9...  — build volume, learn patterns
+  if (cycle === 1) return "hypertrophy";   // Mo 2,6,10... — moderate load, higher volume
+  if (cycle === 2) return "strength";      // Mo 3,7,11... — heavier, lower reps
+  return "deload";                         // Mo 4,8,12... — reduce volume & intensity
+}
+
+// Phase-specific set/rep/RPE schemes
+function getPhaseConfig(level, phase) {
+  const configs = {
+    beginner: {
+      foundation:  { cSets: 3, cReps: "10",  cRPE: "6",   aSets: 3, aReps: "12",  aRPE: "5-6", coreSets: 3, coreReps: "30s", rest: 120, aRest: 90,  tempo: "", wInc: 0,   wIncAcc: 0 },
+      hypertrophy: { cSets: 3, cReps: "8",   cRPE: "7",   aSets: 3, aReps: "10",  aRPE: "6-7", coreSets: 3, coreReps: "30s", rest: 120, aRest: 90,  tempo: "", wInc: 2.5, wIncAcc: 1 },
+      strength:    { cSets: 4, cReps: "6",   cRPE: "7-8", aSets: 3, aReps: "10",  aRPE: "7",   coreSets: 3, coreReps: "40s", rest: 150, aRest: 90,  tempo: "ecc 3s", wInc: 2.5, wIncAcc: 1 },
+      deload:      { cSets: 3, cReps: "8",   cRPE: "5-6", aSets: 2, aReps: "12",  aRPE: "5",   coreSets: 2, coreReps: "30s", rest: 120, aRest: 90,  tempo: "", wInc: -5,  wIncAcc: -2 },
+    },
+    intermediate: {
+      foundation:  { cSets: 4, cReps: "8",   cRPE: "7",   aSets: 3, aReps: "10",  aRPE: "7",   coreSets: 3, coreReps: "40s", rest: 150, aRest: 75,  tempo: "", wInc: 2.5, wIncAcc: 1 },
+      hypertrophy: { cSets: 4, cReps: "6",   cRPE: "7-8", aSets: 4, aReps: "8",   aRPE: "7-8", coreSets: 3, coreReps: "40s", rest: 150, aRest: 75,  tempo: "", wInc: 2.5, wIncAcc: 2 },
+      strength:    { cSets: 4, cReps: "4-5", cRPE: "8-9", aSets: 3, aReps: "8",   aRPE: "8",   coreSets: 3, coreReps: "40s", rest: 180, aRest: 90,  tempo: "ecc 3s", wInc: 5, wIncAcc: 2 },
+      deload:      { cSets: 3, cReps: "8",   cRPE: "6",   aSets: 3, aReps: "10",  aRPE: "6",   coreSets: 2, coreReps: "30s", rest: 120, aRest: 75,  tempo: "", wInc: -5, wIncAcc: -2 },
+    },
+    advanced: {
+      foundation:  { cSets: 4, cReps: "6",   cRPE: "7-8", aSets: 4, aReps: "8",   aRPE: "7-8", coreSets: 3, coreReps: "40s", rest: 180, aRest: 75,  tempo: "", wInc: 2.5, wIncAcc: 2 },
+      hypertrophy: { cSets: 5, cReps: "5",   cRPE: "8",   aSets: 4, aReps: "6-8", aRPE: "8",   coreSets: 3, coreReps: "40s", rest: 180, aRest: 75,  tempo: "", wInc: 5, wIncAcc: 2 },
+      strength:    { cSets: 5, cReps: "3",   cRPE: "9",   aSets: 4, aReps: "6",   aRPE: "8-9", coreSets: 3, coreReps: "40s", rest: 180, aRest: 90,  tempo: "ecc 3s + conc", wInc: 5, wIncAcc: 2.5 },
+      deload:      { cSets: 3, cReps: "6",   cRPE: "6-7", aSets: 3, aReps: "8",   aRPE: "6",   coreSets: 2, coreReps: "30s", rest: 150, aRest: 75,  tempo: "", wInc: -7.5, wIncAcc: -2.5 },
+    }
+  };
+  return (configs[level] || configs.intermediate)[phase] || configs.intermediate.foundation;
+}
+
+// Apply weight increment to a parsed weight
+function progressWeight(weightStr, increment, isCompound) {
+  const parsed = parseWeight(weightStr);
+  if (!parsed) return weightStr || "—";
+  if (parsed.isPercent) {
+    const newPct = Math.min(95, Math.max(50, parsed.value + (increment > 0 ? 5 : -5)));
+    return "@" + Math.round(newPct) + "%";
+  }
+  const inc = parsed.perSide ? increment * 0.5 : increment;
+  const newVal = Math.max(0, parsed.value + inc);
+  return formatWeight({ ...parsed, value: newVal });
+}
+
+// Extract exercise map from a program's block2 (latest state) keyed by exercise name
+function extractPrevExercises(prev) {
+  if (!prev) return {};
+  const map = {};
+  // Use block2 if available (most progressed), else block1
+  const blocks = (prev.block2 && prev.block2.length > 0) ? prev.block2 : prev.block1;
+  if (!blocks) return map;
+  blocks.forEach(day => {
+    if (!day.exercises) return;
+    day.exercises.forEach(ex => {
+      if (ex.section === "Strength" || ex.section === "Core") {
+        map[ex.name.toLowerCase()] = { ...ex, _dayType: day.dayType, _dayLabel: day.dayLabel };
+      }
+    });
+  });
+  return map;
+}
+
+// Micro-progression: Block2 gets slight bump from Block1
+function microProgress(exercises, level) {
+  return exercises.map(ex => {
+    if (ex.section !== "Strength") return { ...ex };
+    const p = parseWeight(ex.weight);
+    if (!p || p.isPercent) {
+      // For percentage-based, bump 2.5%
+      if (p && p.isPercent) return { ...ex, weight: "@" + Math.min(95, Math.round(p.value + 2.5)) + "%" };
+      // For RPE-based, add +0.5 RPE or note
+      return { ...ex, notes: (ex.notes ? ex.notes + " | " : "") + "push harder vs W1-2" };
+    }
+    const bump = p.perSide ? 0.5 : (level === "beginner" ? 1.25 : 2.5);
+    return { ...ex, weight: formatWeight({ ...p, value: p.value + bump }) };
+  });
+}
+
 function pickRandom(arr, count) { const s = [...arr].sort(() => Math.random() - 0.5); return s.slice(0, Math.min(count, arr.length)); }
 function buildDaySchedule(spw, d3 = "glute") { if (spw === 3) return ["Q", "H", d3 === "glute" ? "G" : "F"]; const s = []; for (let i = 0; i < spw; i++) s.push(i % 2 === 0 ? "A" : "B"); return s; }
 
-// ─── EXTRACT PREVIOUS PROGRAM EXERCISES ───
-function extractPrevIds(prev) {
-  if (!prev) return new Set();
-  const ids = new Set();
-  [prev.block1, prev.block2].forEach(block => { if (!block) return; block.forEach(day => { day.exercises.forEach(ex => { if (ex.section === "Strength") ids.add(ex.id); }); }); });
-  return ids;
-}
-
-function generateDay(dayType, levelCfg, durationCfg, block, usedExercises = new Set(), location = "gym", prevIds = new Set()) {
+function generateDay(dayType, phaseCfg, durationCfg, block, usedExercises, location, prevExMap, phase) {
   const exercises = [];
   const P = {}; Object.keys(EXERCISES).forEach(k => { P[k] = filterLoc(EXERCISES[k], location); });
   const isA = dayType === "A", isB = dayType === "B", isQ = dayType === "Q", isH = dayType === "H", isG = dayType === "G", isFB = dayType === "F";
 
-  // Mobility
+  // Warm-Up
   const mobFocus = (isA || isQ) ? "A" : isB || isH ? "B" : "both";
   pickRandom(P.mobility.filter(e => e.focus === "both" || e.focus === mobFocus), durationCfg.mobilityCount).forEach(ex => {
     exercises.push({ ...ex, section: "Warm-Up", sets: 2, reps: "10 each", rest: 0, weight: "BW", rpe: "", notes: "" });
   });
 
-  // pickFresh: prefer exercises NOT in current program AND NOT in previous program
-  const pickFresh = (pool, n) => {
-    const fresh = pool.filter(e => !usedExercises.has(e.id) && !prevIds.has(e.id));
-    if (fresh.length >= n) return pickRandom(fresh, n);
-    const notCurrent = pool.filter(e => !usedExercises.has(e.id));
-    if (notCurrent.length >= n) return pickRandom(notCurrent, n);
-    return pickRandom(pool, n);
+  // Try to reuse a previous exercise with progression, or pick fresh
+  const pickWithProgression = (pool, n, isCompound) => {
+    const result = [];
+    const inc = isCompound ? phaseCfg.wInc : phaseCfg.wIncAcc;
+    const sets = isCompound ? phaseCfg.cSets : phaseCfg.aSets;
+    const reps = isCompound ? phaseCfg.cReps : phaseCfg.aReps;
+    const rpe = isCompound ? phaseCfg.cRPE : phaseCfg.aRPE;
+    const rest = isCompound ? phaseCfg.rest : phaseCfg.aRest;
+
+    // First: try to carry over exercises from previous program
+    const available = pool.filter(e => !usedExercises.has(e.id));
+    const carried = [];
+    const fresh = [];
+    available.forEach(e => {
+      const prev = prevExMap[e.name.toLowerCase()];
+      if (prev) carried.push({ ex: e, prev });
+      else fresh.push(e);
+    });
+
+    // Keep ~65% from previous, rotate ~35%
+    const keepCount = Math.ceil(n * 0.65);
+    const rotateCount = n - keepCount;
+
+    // Carry over with progression
+    const toKeep = carried.slice(0, keepCount);
+    toKeep.forEach(({ ex, prev }) => {
+      const newWeight = progressWeight(prev.weight, inc, isCompound);
+      const tempoNote = phaseCfg.tempo && !prev.notes?.includes("ecc") ? phaseCfg.tempo : "";
+      const notes = [prev.notes || "", tempoNote].filter(Boolean).join(" | ");
+      result.push({ ...ex, section: "Strength", sets, reps, rest, weight: newWeight, rpe, notes: notes.trim() });
+      usedExercises.add(ex.id);
+    });
+
+    // Fill remaining with fresh exercises
+    const needed = n - result.length;
+    if (needed > 0) {
+      const freshPicks = pickRandom(fresh.length >= needed ? fresh : available.filter(e => !usedExercises.has(e.id)), needed);
+      freshPicks.forEach(ex => {
+        // For new exercises, estimate starting weight from any similar previous exercise
+        const prevSimilar = Object.values(prevExMap).find(p => p.category === ex.category && p._dayType === dayType);
+        const startWeight = prevSimilar ? prevSimilar.weight : "—";
+        const tempoNote = phaseCfg.tempo ? phaseCfg.tempo : "";
+        result.push({ ...ex, section: "Strength", sets, reps, rest, weight: startWeight, rpe, notes: tempoNote || "NEW — adjust weight" });
+        usedExercises.add(ex.id);
+      });
+    }
+    return result;
   };
 
+  // Day-type specific exercise selection (same structure as before but with progression)
   if (isQ) {
     const quadPool = P.compound_push_squat.filter(e => e.muscles?.some(m => ["quads","glutes","core"].includes(m)));
     const pushPool = P.compound_push_squat.filter(e => e.muscles?.some(m => ["chest","triceps","shoulders"].includes(m)));
-    [...pickFresh(quadPool, 1), ...pickFresh(pushPool, 1)].forEach(ex => { exercises.push({ ...ex, section: "Strength", sets: levelCfg.compoundSets, reps: levelCfg.compoundReps, rest: levelCfg.restCompound, weight: "—", rpe: levelCfg.compoundRPE, notes: "" }); usedExercises.add(ex.id); });
+    pickWithProgression(quadPool, 1, true).forEach(e => exercises.push(e));
+    pickWithProgression(pushPool, 1, true).forEach(e => exercises.push(e));
     const lungePool = P.accessory_push_squat.filter(e => e.muscles?.some(m => ["quads","glutes"].includes(m)));
     const shoulderPool = P.accessory_push_squat.filter(e => e.muscles?.some(m => ["shoulders"].includes(m)));
     const legCurlPool = P.accessory_pull_hinge.filter(e => e.muscles?.some(m => ["hamstrings"].includes(m)));
-    const acc = [...pickFresh(lungePool, 1), ...pickFresh(shoulderPool, 1)];
-    if (durationCfg.accessoryCount >= 3) acc.push(...pickFresh(legCurlPool, 1));
-    if (durationCfg.accessoryCount >= 4) acc.push(...pickFresh(P.accessory_push_squat.filter(e => e.muscles?.some(m => ["triceps","chest","upper chest"].includes(m))), 1));
-    acc.forEach(ex => { exercises.push({ ...ex, section: "Strength", sets: levelCfg.accessorySets, reps: levelCfg.accessoryReps, rest: levelCfg.restAccessory, weight: "—", rpe: levelCfg.accessoryRPE, notes: "" }); usedExercises.add(ex.id); });
+    pickWithProgression(lungePool, 1, false).forEach(e => exercises.push(e));
+    pickWithProgression(shoulderPool, 1, false).forEach(e => exercises.push(e));
+    if (durationCfg.accessoryCount >= 3) pickWithProgression(legCurlPool, 1, false).forEach(e => exercises.push(e));
   } else if (isH) {
-    const hingePool = P.compound_pull_hinge.filter(e => e.muscles?.some(m => ["posterior chain","hamstrings","glutes","inner thigh"].includes(m)));
+    const hingePool = P.compound_pull_hinge.filter(e => e.muscles?.some(m => ["posterior chain","hamstrings","glutes"].includes(m)));
     const rowPool = P.compound_pull_hinge.filter(e => e.muscles?.some(m => ["back","biceps"].includes(m)));
-    [...pickFresh(hingePool, 1), ...pickFresh(rowPool, 1)].forEach(ex => { exercises.push({ ...ex, section: "Strength", sets: levelCfg.compoundSets, reps: levelCfg.compoundReps, rest: levelCfg.restCompound, weight: "—", rpe: levelCfg.compoundRPE, notes: "" }); usedExercises.add(ex.id); });
-    if (location === "gym") { const pullUpPool = P.compound_pull_hinge.filter(e => e.name.includes("Pull-Up") || e.name.includes("Chin-Up")); if (pullUpPool.length > 0) { const pu = pickFresh(pullUpPool, 1)[0]; exercises.push({ ...pu, section: "Strength", sets: levelCfg.compoundSets, reps: levelCfg.compoundReps, rest: levelCfg.restCompound, weight: "—", rpe: levelCfg.compoundRPE, notes: "" }); usedExercises.add(pu.id); } }
-    const pullAccPool = P.accessory_pull_hinge.filter(e => e.muscles?.some(m => ["back","rear delts","glutes"].includes(m)));
-    const bicepPool = P.accessory_pull_hinge.filter(e => e.muscles?.some(m => ["biceps","triceps"].includes(m)));
-    const acc = [...pickFresh(pullAccPool, Math.min(durationCfg.accessoryCount, 2))];
-    if (durationCfg.accessoryCount >= 3) acc.push(...pickFresh(bicepPool, 1));
-    acc.forEach(ex => { exercises.push({ ...ex, section: "Strength", sets: levelCfg.accessorySets, reps: levelCfg.accessoryReps, rest: levelCfg.restAccessory, weight: "—", rpe: levelCfg.accessoryRPE, notes: "" }); usedExercises.add(ex.id); });
+    pickWithProgression(hingePool, 1, true).forEach(e => exercises.push(e));
+    pickWithProgression(rowPool, 1, true).forEach(e => exercises.push(e));
+    if (location === "gym") { const puPool = P.compound_pull_hinge.filter(e => e.name.includes("Pull-Up") || e.name.includes("Chin-Up")); pickWithProgression(puPool, 1, true).forEach(e => exercises.push(e)); }
+    const accPool = P.accessory_pull_hinge.filter(e => e.muscles?.some(m => ["back","rear delts","glutes","hamstrings"].includes(m)));
+    pickWithProgression(accPool, Math.min(durationCfg.accessoryCount, 2), false).forEach(e => exercises.push(e));
   } else if (isG) {
-    const htPool = P.accessory_pull_hinge.filter(e => e.name.toLowerCase().includes("hip thrust") || e.name.toLowerCase().includes("glute bridge") || e.name.toLowerCase().includes("bridge"));
-    const ht = pickFresh(htPool, 2);
-    if (ht.length >= 1) { exercises.push({ ...ht[0], section: "Strength", sets: levelCfg.compoundSets, reps: levelCfg.compoundReps, rest: levelCfg.restCompound, weight: "—", rpe: levelCfg.compoundRPE, notes: "Heavy" }); usedExercises.add(ht[0].id); }
-    if (ht.length >= 2) { exercises.push({ ...ht[1], section: "Strength", sets: levelCfg.compoundSets, reps: String(parseInt(levelCfg.compoundReps) + 2 || levelCfg.accessoryReps), rest: levelCfg.restCompound, weight: "—", rpe: String(parseInt(levelCfg.compoundRPE) - 1 || levelCfg.accessoryRPE), notes: "Volume" }); usedExercises.add(ht[1].id); }
-    const rdlPool = [...P.accessory_pull_hinge.filter(e => e.name.includes("Single-Leg") || e.name.includes("Good Morning") || e.name.includes("Hamstring")), ...P.accessory_push_squat.filter(e => e.name.includes("Bulgarian") || e.name.includes("Reverse") || e.name.includes("Goblet"))];
-    const gluteIso = P.accessory_pull_hinge.filter(e => e.name.includes("Abductor") || e.name.includes("Kickback") || e.name.includes("Cable Pull") || e.name.includes("Clamshell"));
-    const upperAcc = P.accessory_push_squat.filter(e => e.muscles?.some(m => ["upper chest","chest","triceps","shoulders"].includes(m)));
-    const acc = [...pickFresh(rdlPool, 1), ...pickFresh(gluteIso.length > 0 ? gluteIso : rdlPool, 1)];
-    if (durationCfg.accessoryCount >= 3) acc.push(...pickFresh(upperAcc, 1));
-    if (durationCfg.accessoryCount >= 4) acc.push(...pickFresh(upperAcc.filter(e => !acc.find(a => a.id === e.id)), 1));
-    acc.forEach(ex => { exercises.push({ ...ex, section: "Strength", sets: levelCfg.accessorySets, reps: levelCfg.accessoryReps, rest: levelCfg.restAccessory, weight: "—", rpe: levelCfg.accessoryRPE, notes: "" }); usedExercises.add(ex.id); });
+    const htPool = P.accessory_pull_hinge.filter(e => e.name.toLowerCase().includes("hip thrust") || e.name.toLowerCase().includes("glute bridge"));
+    pickWithProgression(htPool, 1, true).forEach(e => exercises.push(e));
+    const gluteAcc = [...P.accessory_pull_hinge.filter(e => e.name.includes("Single-Leg") || e.name.includes("Abductor") || e.name.includes("Kickback")), ...P.accessory_push_squat.filter(e => e.name.includes("Bulgarian") || e.name.includes("Reverse") || e.name.includes("Goblet"))];
+    pickWithProgression(gluteAcc, durationCfg.accessoryCount, false).forEach(e => exercises.push(e));
   } else if (isFB) {
     const lowerPool = block % 2 === 0 ? P.compound_push_squat.filter(e => e.muscles?.some(m => ["quads","glutes","core"].includes(m))) : P.compound_pull_hinge.filter(e => e.muscles?.some(m => ["posterior chain","hamstrings","glutes"].includes(m)));
     const upperPool = block % 2 === 0 ? P.compound_pull_hinge.filter(e => e.muscles?.some(m => ["back","biceps"].includes(m))) : P.compound_push_squat.filter(e => e.muscles?.some(m => ["chest","triceps","shoulders"].includes(m)));
-    [...pickFresh(lowerPool, 1), ...pickFresh(upperPool, 1)].forEach(ex => { exercises.push({ ...ex, section: "Strength", sets: levelCfg.compoundSets, reps: levelCfg.compoundReps, rest: levelCfg.restCompound, weight: "—", rpe: levelCfg.compoundRPE, notes: "" }); usedExercises.add(ex.id); });
-    pickFresh([...P.accessory_push_squat, ...P.accessory_pull_hinge], durationCfg.accessoryCount).forEach(ex => { exercises.push({ ...ex, section: "Strength", sets: levelCfg.accessorySets, reps: levelCfg.accessoryReps, rest: levelCfg.restAccessory, weight: "—", rpe: levelCfg.accessoryRPE, notes: "" }); usedExercises.add(ex.id); });
+    pickWithProgression(lowerPool, 1, true).forEach(e => exercises.push(e));
+    pickWithProgression(upperPool, 1, true).forEach(e => exercises.push(e));
+    pickWithProgression([...P.accessory_push_squat, ...P.accessory_pull_hinge], durationCfg.accessoryCount, false).forEach(e => exercises.push(e));
   } else {
-    const compoundPool = isA ? P.compound_push_squat : P.compound_pull_hinge;
-    const upperM = isA ? ["chest","triceps","shoulders","legs"] : ["back","biceps"];
-    const lowerM = isA ? ["quads","glutes","core"] : ["posterior chain","hamstrings","glutes","inner thigh"];
-    [...pickFresh(compoundPool.filter(e => e.muscles?.some(m => lowerM.includes(m))), 1), ...pickFresh(compoundPool.filter(e => e.muscles?.some(m => upperM.includes(m))), 1)].forEach(ex => { exercises.push({ ...ex, section: "Strength", sets: levelCfg.compoundSets, reps: levelCfg.compoundReps, rest: levelCfg.restCompound, weight: "—", rpe: levelCfg.compoundRPE, notes: "" }); usedExercises.add(ex.id); });
-    pickFresh(isA ? P.accessory_push_squat : P.accessory_pull_hinge, durationCfg.accessoryCount).forEach(ex => { exercises.push({ ...ex, section: "Strength", sets: levelCfg.accessorySets, reps: levelCfg.accessoryReps, rest: levelCfg.restAccessory, weight: "—", rpe: levelCfg.accessoryRPE, notes: "" }); usedExercises.add(ex.id); });
+    // A/B split
+    const compPool = isA ? P.compound_push_squat : P.compound_pull_hinge;
+    const upperM = isA ? ["chest","triceps","shoulders"] : ["back","biceps"];
+    const lowerM = isA ? ["quads","glutes","core"] : ["posterior chain","hamstrings","glutes"];
+    pickWithProgression(compPool.filter(e => e.muscles?.some(m => lowerM.includes(m))), 1, true).forEach(e => exercises.push(e));
+    pickWithProgression(compPool.filter(e => e.muscles?.some(m => upperM.includes(m))), 1, true).forEach(e => exercises.push(e));
+    pickWithProgression(isA ? P.accessory_push_squat : P.accessory_pull_hinge, durationCfg.accessoryCount, false).forEach(e => exercises.push(e));
   }
 
-  pickRandom(P.core, durationCfg.coreCount).forEach(ex => { exercises.push({ ...ex, section: "Core", sets: levelCfg.coreSets, reps: levelCfg.coreReps, rest: 45, weight: "BW", rpe: "", notes: "" }); });
+  // Core
+  pickRandom(P.core, durationCfg.coreCount).forEach(ex => {
+    exercises.push({ ...ex, section: "Core", sets: phaseCfg.coreSets, reps: phaseCfg.coreReps, rest: 45, weight: "BW", rpe: "", notes: "" });
+  });
+
+  // Finisher
   const hiitExs = pickRandom(P.hiit, durationCfg.hiitCount);
   const finFmt = location === "home" ? "AMRAP / Circuit" : "HIIT Circuit";
-  const finReps = location === "home" ? "Circuit — see notes" : "40s on / 20s off";
-  exercises.push({ id: "hiit_" + dayType + "_" + block + "_" + Math.random().toString(36).slice(2,6), name: finFmt, category: "hiit", section: "Finisher", sets: durationCfg.hiitRounds, reps: finReps, rest: 60, weight: "—", rpe: "9", notes: "", circuit: hiitExs.map(e => e.name) });
+  const finReps = phase === "deload" ? "30s on / 30s off" : (location === "home" ? "Circuit — see notes" : "40s on / 20s off");
+  const finRounds = phase === "deload" ? Math.max(2, durationCfg.hiitRounds - 1) : durationCfg.hiitRounds;
+  exercises.push({ id: "hiit_" + dayType + "_" + block + "_" + Math.random().toString(36).slice(2,6), name: finFmt, category: "hiit", section: "Finisher", sets: finRounds, reps: finReps, rest: 60, weight: "—", rpe: phase === "deload" ? "6-7" : "9", notes: "", circuit: hiitExs.map(e => e.name) });
+
   return exercises;
 }
 
 function generateProgram(client, previousProgram = null) {
   const monthNumber = previousProgram ? (previousProgram.monthNumber || 1) + 1 : (client.monthNumber || 1);
-  const levelCfg = getLevelConfig(client.level, monthNumber);
+  const phase = getPhase(monthNumber);
+  const phaseCfg = getPhaseConfig(client.level, phase);
   const durationCfg = DURATION_CONFIG[client.sessionDuration || 60];
   const schedule = buildDaySchedule(client.sessionsPerWeek || 3, client.day3Type || "glute");
   const dayLabels = { A: "Push + Squat", B: "Pull + Hinge", Q: "Quad + Push", H: "Hinge + Pull", G: "Glute Focus", F: "Full Body" };
   const loc = client.trainingLocation || "gym";
-  const prevIds = extractPrevIds(previousProgram);
-  const genBlock = (bn) => { const used = new Set(); return schedule.map((dt, i) => ({ dayLabel: "Day " + (i+1), focus: dayLabels[dt], dayType: dt, exercises: generateDay(dt, levelCfg, durationCfg, bn, used, loc, prevIds) })); };
+  const prevExMap = extractPrevExercises(previousProgram);
+  const phaseLabel = { foundation: "Foundation", hypertrophy: "Hypertrophy", strength: "Strength", deload: "Deload" }[phase];
+
+  // Generate Block 1 (W1-2)
+  const usedB1 = new Set();
+  const block1 = schedule.map((dt, i) => ({ dayLabel: "Day " + (i+1), focus: dayLabels[dt], dayType: dt, exercises: generateDay(dt, phaseCfg, durationCfg, 0, usedB1, loc, prevExMap, phase) }));
+
+  // Generate Block 2 (W3-4) — micro-progression from Block 1
+  const block2 = block1.map(day => ({
+    ...day,
+    exercises: microProgress(day.exercises, client.level)
+  }));
+
   const cardioDays = client.cardioDaysPerWeek || 0;
   return {
     id: "prog_" + Date.now(), clientId: client.id, clientName: client.name, level: client.level,
     monthNumber, sessionsPerWeek: client.sessionsPerWeek || 3, sessionDuration: client.sessionDuration || 60, trainingLocation: loc, createdAt: new Date().toISOString(),
-    block1: genBlock(0), block2: genBlock(1), levelCfg, durationCfg,
+    block1, block2, levelCfg: phaseCfg, durationCfg, phase: phaseLabel,
     includesRunning: client.includesRunning || cardioDays > 0, cardioDaysPerWeek: cardioDays,
     cardio: cardioDays > 0 ? { block1: generateCardioDays(client.level, cardioDays, 0), block2: generateCardioDays(client.level, cardioDays, 1) } : null,
     running: client.includesRunning && cardioDays === 0 ? {
@@ -1269,7 +1423,7 @@ const supaFetch = (path, { method = "GET", body, prefer } = {}) =>
 const clToDb = c => ({ id: c.id, name: c.name, email: c.email || "", phone: c.phone || "", level: c.level, month_number: c.monthNumber || 1, sessions_per_week: c.sessionsPerWeek || 3, session_duration: c.sessionDuration || 60, day3_type: c.day3Type || "glute", training_location: c.trainingLocation || "gym", cardio_days_per_week: c.cardioDaysPerWeek || 0, goals: c.goals || "", health_notes: c.healthNotes || "", injuries: c.injuries || [], includes_running: c.includesRunning || false, start_date: c.startDate || "", status: c.status || "active" });
 const clFromDb = r => ({ id: r.id, name: r.name, email: r.email, phone: r.phone, level: r.level, monthNumber: r.month_number, sessionsPerWeek: r.sessions_per_week, sessionDuration: r.session_duration, day3Type: r.day3_type, trainingLocation: r.training_location, cardioDaysPerWeek: r.cardio_days_per_week, goals: r.goals, healthNotes: r.health_notes, injuries: r.injuries, includesRunning: r.includes_running, startDate: r.start_date, status: r.status });
 const prToDb = p => ({ id: p.id, client_id: p.clientId, client_name: p.clientName, level: p.level, month_number: p.monthNumber, sessions_per_week: p.sessionsPerWeek || 3, session_duration: p.sessionDuration || 60, training_location: p.trainingLocation || "gym", includes_running: p.includesRunning || false, cardio_days_per_week: p.cardioDaysPerWeek || 0, block1: p.block1, block2: p.block2, cardio: p.cardio || null, running: p.running || null, level_cfg: p.levelCfg || null, duration_cfg: p.durationCfg || null, created_at: p.createdAt });
-const prFromDb = r => ({ id: r.id, clientId: r.client_id, clientName: r.client_name, level: r.level, monthNumber: r.month_number, sessionsPerWeek: r.sessions_per_week, sessionDuration: r.session_duration, trainingLocation: r.training_location, includesRunning: r.includes_running, cardioDaysPerWeek: r.cardio_days_per_week, block1: r.block1, block2: r.block2, cardio: r.cardio, running: r.running, levelCfg: r.level_cfg, durationCfg: r.duration_cfg, createdAt: r.created_at });
+const prFromDb = r => { const mn = r.month_number || 1; const phases = ["foundation","hypertrophy","strength","deload"]; const ph = { foundation: "Foundation", hypertrophy: "Hypertrophy", strength: "Strength", deload: "Deload" }[phases[(mn - 1) % 4]] || ""; return { id: r.id, clientId: r.client_id, clientName: r.client_name, level: r.level, monthNumber: mn, sessionsPerWeek: r.sessions_per_week, sessionDuration: r.session_duration, trainingLocation: r.training_location, includesRunning: r.includes_running, cardioDaysPerWeek: r.cardio_days_per_week, block1: r.block1, block2: r.block2, cardio: r.cardio, running: r.running, levelCfg: r.level_cfg, durationCfg: r.duration_cfg, createdAt: r.created_at, phase: ph }; };
 const dbLoad = table => supaFetch(`${table}?select=*&order=${table === "clients" ? "name" : "created_at"}`);
 const dbSave = (table, data) => supaFetch(table, { method: "POST", body: data, prefer: "return=representation,resolution=merge-duplicates" });
 const dbDelete = (table, id) => supaFetch(`${table}?id=eq.${id}`, { method: "DELETE" });
