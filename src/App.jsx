@@ -1616,193 +1616,153 @@ export default function App() {
 
   const exportPDF = (prog) => {
     try {
-    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-    const W = doc.internal.pageSize.getWidth();
-    const H = doc.internal.pageSize.getHeight();
-    const margin = 12;
-    let y = margin;
-
-    const accent = [15, 30, 75];
-    const accentText = [130, 200, 255];
-    const headerBg = [20, 40, 90];
-    const rowAlt = [235, 243, 255];
-    const white = [255, 255, 255];
-
-    // Title
-    doc.setFillColor(...accent);
-    doc.rect(0, 0, W, 22, "F");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.setTextColor(...white);
-    doc.text(`${prog.clientName || "Client"} — Blocco ${prog.monthNumber || 1}`, margin, 14);
-    doc.setFontSize(9);
-    doc.setTextColor(...accentText);
-    doc.text(`${(prog.level || "").toUpperCase()} · ${prog.sessionsPerWeek || 3}x/week · ${prog.sessionDuration || 60}min · ${prog.trainingLocation === "home" ? "Home Gym" : "Gym"}`, W - margin, 14, { align: "right" });
-    y = 28;
-
     const fmtSR = (ex) => { if (!ex) return ""; const s = (ex.sets != null && String(ex.sets) !== "undefined") ? ex.sets : ""; const r = (ex.reps != null && String(ex.reps) !== "undefined") ? ex.reps : ""; return (s || r) ? `${s}×${r}` : ""; };
     const fmtRest = (r) => { if (r === undefined || r === null || r === "") return ""; const n = parseInt(r); if (!n || isNaN(n)) return String(r || ""); return n >= 120 ? (n / 60) + "'" : n + "''"; };
+    const accent = [15, 30, 75]; const accentText = [130, 200, 255]; const headerBg = [20, 40, 90]; const rowAlt = [235, 243, 255]; const white = [255, 255, 255];
+    const clientName = prog.clientName || "Client";
+    const monthNum = prog.monthNumber || 1;
 
-    // For each day, merge block1 and block2 into one table
-    const numDays = Math.max(prog.block1.length, prog.block2.length);
-    for (let di = 0; di < numDays; di++) {
-      const d1 = prog.block1[di];
-      const d2 = prog.block2[di];
-      const dayLabel = (d1 || d2).dayLabel;
-      const dayFocus = (d1 || d2).focus;
-      const exs1 = d1 ? d1.exercises : [];
-      const exs2 = d2 ? d2.exercises : [];
-      const maxLen = Math.max(exs1.length, exs2.length);
+    const buildBlockPDF = (doc, blockData, blockNum, weekLabel, cardioData, runningData) => {
+      const W = doc.internal.pageSize.getWidth();
+      const H = doc.internal.pageSize.getHeight();
+      const margin = 12;
 
-      // Check if we need a new page
-      const estHeight = 12 + maxLen * 6.5 + 8;
-      if (y + estHeight > H - 10) { doc.addPage(); y = margin; }
-
-      // Day header
-      doc.setFillColor(15, 30, 75);
-      doc.rect(margin, y, W - margin * 2, 8, "F");
+      // Block title page
+      doc.addPage();
+      let y = margin;
+      doc.setFillColor(...accent);
+      doc.rect(0, 0, W, 22, "F");
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.setTextColor(255, 255, 255);
-      doc.text(`${dayLabel.toUpperCase()} — ${dayFocus.toUpperCase()}`, margin + 4, y + 5.5);
-      y += 10;
+      doc.setFontSize(16);
+      doc.setTextColor(...white);
+      doc.text(`${clientName} — Blocco ${monthNum} · ${weekLabel}`, margin, 14);
+      doc.setFontSize(9);
+      doc.setTextColor(...accentText);
+      doc.text(`${(prog.level || "").toUpperCase()} · ${prog.sessionsPerWeek || 3}x/week · ${prog.sessionDuration || 60}min · ${prog.trainingLocation === "home" ? "Home Gym" : "Gym"}`, W - margin, 14, { align: "right" });
+      y = 28;
 
-      // Build rows
-      const rows = [];
-      let lastSection = "";
-      for (let ei = 0; ei < maxLen; ei++) {
-        const e1 = exs1[ei];
-        const e2 = exs2[ei];
-        const ex = e1 || e2;
-        if (!ex) continue;
+      // Days
+      if (blockData) {
+        for (let di = 0; di < blockData.length; di++) {
+          const day = blockData[di];
+          if (!day) continue;
+          const exs = day.exercises || [];
 
-        // Section separator
-        if (ex.section && ex.section !== lastSection && ex.section !== "Warm-Up") {
-          if (lastSection !== "" || ei > 0) {
-            rows.push([{ content: ex.section.toUpperCase(), colSpan: 6, styles: { fillColor: [25, 50, 110], textColor: [130, 200, 255], fontStyle: "bold", fontSize: 7, cellPadding: 1.5 } }]);
+          const estHeight = 12 + exs.length * 6.5 + 8;
+          if (y + estHeight > H - 10) { doc.addPage(); y = margin; }
+
+          // Day header
+          doc.setFillColor(15, 30, 75);
+          doc.rect(margin, y, W - margin * 2, 8, "F");
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(10);
+          doc.setTextColor(255, 255, 255);
+          doc.text(`${(day.dayLabel || "").toUpperCase()} — ${(day.focus || "").toUpperCase()}`, margin + 4, y + 5.5);
+          y += 10;
+
+          const rows = [];
+          let lastSection = "";
+          for (let ei = 0; ei < exs.length; ei++) {
+            const ex = exs[ei];
+            if (!ex) continue;
+
+            if (ex.section && ex.section !== lastSection && ex.section !== "Warm-Up") {
+              if (lastSection !== "" || ei > 0) {
+                rows.push([{ content: ex.section.toUpperCase(), colSpan: 5, styles: { fillColor: [25, 50, 110], textColor: [130, 200, 255], fontStyle: "bold", fontSize: 7, cellPadding: 1.5 } }]);
+              }
+              lastSection = ex.section;
+            } else if (ei === 0 && ex.section) { lastSection = ex.section; }
+
+            const name = (ex.name || "") + (ex.circuit ? " (" + ex.circuit.join(", ") + ")" : "");
+            const sr = fmtSR(ex);
+            const weight = ex.weight || "—";
+            const rest = fmtRest(ex.rest);
+            const notes = ex.notes || "";
+            rows.push([name || "", sr || "", weight || "—", rest || "", notes || ""]);
           }
-          lastSection = ex.section;
-        } else if (ei === 0 && ex.section) {
-          lastSection = ex.section;
+
+          autoTable(doc, {
+            startY: y, margin: { left: margin, right: margin },
+            head: [["Esercizio", "Serie×Rep", "Carico", "Rec.", "Note"]],
+            body: rows, theme: "grid",
+            styles: { fontSize: 8, cellPadding: 2, lineColor: [220, 220, 225], lineWidth: 0.2 },
+            headStyles: { fillColor: headerBg, textColor: white, fontStyle: "bold", fontSize: 8 },
+            alternateRowStyles: { fillColor: rowAlt },
+            columnStyles: {
+              0: { cellWidth: 75, fontStyle: "bold" },
+              1: { cellWidth: 30, halign: "center" },
+              2: { cellWidth: 30, halign: "center" },
+              3: { cellWidth: 20, halign: "center" },
+              4: { cellWidth: "auto", fontStyle: "italic", fontSize: 7, textColor: [60, 80, 120] },
+            },
+          });
+          y = doc.lastAutoTable.finalY + 8;
         }
-
-        const name = (ex.name || "") + (ex.circuit ? " (" + ex.circuit.join(", ") + ")" : "");
-        const w12 = fmtSR(e1);
-        const w34 = fmtSR(e2);
-        const weight = (e1 || e2).weight || "—";
-        const rest = fmtRest((e1 || e2).rest);
-        const notes = (e1 || e2).notes || "";
-
-        rows.push([name || "", w12 || "", w34 || "", weight || "—", rest || "", notes || ""]);
       }
 
-      autoTable(doc, {
-        startY: y,
-        margin: { left: margin, right: margin },
-        head: [["Esercizio", "Sett. 1-2", "Sett. 3-4", "Carico", "Rec.", "Note"]],
-        body: rows,
-        theme: "grid",
-        styles: { fontSize: 8, cellPadding: 2, lineColor: [220, 220, 225], lineWidth: 0.2 },
-        headStyles: { fillColor: headerBg, textColor: white, fontStyle: "bold", fontSize: 8 },
-        alternateRowStyles: { fillColor: rowAlt },
-        columnStyles: {
-          0: { cellWidth: 65, fontStyle: "bold" },
-          1: { cellWidth: 28, halign: "center" },
-          2: { cellWidth: 28, halign: "center" },
-          3: { cellWidth: 30, halign: "center" },
-          4: { cellWidth: 18, halign: "center" },
-          5: { cellWidth: "auto", fontStyle: "italic", fontSize: 7, textColor: [60, 80, 120] },
-        },
-      });
-      y = doc.lastAutoTable.finalY + 8;
-    }
-
-    // Cardio sections
-    if (prog.cardio) {
-      const c1 = prog.cardio.block1 || [];
-      const c2 = prog.cardio.block2 || [];
-      const maxC = Math.max(c1.length, c2.length);
-      if (maxC > 0) {
+      // Cardio
+      if (cardioData && cardioData.length > 0) {
         if (y + 40 > H - 10) { doc.addPage(); y = margin; }
-
         doc.setFillColor(25, 50, 110);
         doc.rect(margin, y, W - margin * 2, 8, "F");
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(10);
-        doc.setTextColor(255, 255, 255);
-        doc.text("CARDIO PROGRAMMING", margin + 4, y + 5.5);
+        doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(255, 255, 255);
+        doc.text("CARDIO", margin + 4, y + 5.5);
         y += 10;
-
-        const cRows = [];
-        for (let ci = 0; ci < maxC; ci++) {
-          const s1 = c1[ci];
-          const s2 = c2[ci];
-          const s = s1 || s2;
-          cRows.push([
-            s.dayLabel || ("Cardio " + (ci + 1)),
-            s1 ? (s1.type || "") : "",
-            s1 ? (s1.work || "") : "",
-            s2 ? (s2.type || "") : "",
-            s2 ? (s2.work || "") : "",
-            s.rpe ? "RPE " + s.rpe : "",
-          ]);
-        }
-
+        const cRows = cardioData.map((s, i) => [s.dayLabel || ("Cardio " + (i+1)), s.type || "", s.work || "", s.rpe ? "RPE " + s.rpe : ""]);
         autoTable(doc, {
-          startY: y,
-          margin: { left: margin, right: margin },
-          head: [["Day", "Type (W1-2)", "Work (W1-2)", "Type (W3-4)", "Work (W3-4)", "RPE"]],
-          body: cRows,
-          theme: "grid",
+          startY: y, margin: { left: margin, right: margin },
+          head: [["Day", "Type", "Work", "RPE"]], body: cRows, theme: "grid",
           styles: { fontSize: 8, cellPadding: 2, lineColor: [220, 220, 225], lineWidth: 0.2 },
-          headStyles: { fillColor: [20, 40, 90], textColor: white, fontStyle: "bold", fontSize: 8 },
-          alternateRowStyles: { fillColor: [235, 243, 255] },
-          columnStyles: { 0: { cellWidth: 22, fontStyle: "bold" }, 1: { cellWidth: 32 }, 2: { cellWidth: "auto" }, 3: { cellWidth: 32 }, 4: { cellWidth: "auto" }, 5: { cellWidth: 20, halign: "center" } },
+          headStyles: { fillColor: headerBg, textColor: white, fontStyle: "bold", fontSize: 8 },
+          alternateRowStyles: { fillColor: rowAlt },
         });
         y = doc.lastAutoTable.finalY + 8;
       }
-    }
 
-    // Running sections
-    if (prog.running) {
-      if (y + 30 > H - 10) { doc.addPage(); y = margin; }
-      doc.setFillColor(25, 50, 110);
-      doc.rect(margin, y, W - margin * 2, 8, "F");
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.setTextColor(255, 255, 255);
-      doc.text("RUNNING", margin + 4, y + 5.5);
-      y += 10;
-      const rRows = [];
-      const r1 = prog.running.block1 || [];
-      const r2 = prog.running.block2 || [];
-      const maxR = Math.max(r1.length, r2.length);
-      for (let ri = 0; ri < maxR; ri++) {
-        const s1 = r1[ri]; const s2 = r2[ri]; const s = s1 || s2;
-        rRows.push([s.day || "", s1 ? `${s1.type || ""} · ${s1.duration || ""}` : "", s1 ? (s1.notes || "") : "", s2 ? `${s2.type || ""} · ${s2.duration || ""}` : "", s2 ? (s2.notes || "") : ""]);
+      // Running
+      if (runningData && runningData.length > 0) {
+        if (y + 30 > H - 10) { doc.addPage(); y = margin; }
+        doc.setFillColor(25, 50, 110);
+        doc.rect(margin, y, W - margin * 2, 8, "F");
+        doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(255, 255, 255);
+        doc.text("RUNNING", margin + 4, y + 5.5);
+        y += 10;
+        const rRows = runningData.map(s => [s.day || "", `${s.type || ""} · ${s.duration || ""}`, s.notes || ""]);
+        autoTable(doc, {
+          startY: y, margin: { left: margin, right: margin },
+          head: [["Day", "Session", "Notes"]], body: rRows, theme: "grid",
+          styles: { fontSize: 8, cellPadding: 2, lineColor: [220, 220, 225], lineWidth: 0.2 },
+          headStyles: { fillColor: headerBg, textColor: white, fontStyle: "bold", fontSize: 8 },
+          alternateRowStyles: { fillColor: rowAlt },
+        });
       }
-      autoTable(doc, {
-        startY: y, margin: { left: margin, right: margin },
-        head: [["Day", "W1-2", "Notes", "W3-4", "Notes"]],
-        body: rRows, theme: "grid",
-        styles: { fontSize: 8, cellPadding: 2, lineColor: [220, 220, 225], lineWidth: 0.2 },
-        headStyles: { fillColor: [20, 40, 90], textColor: white, fontStyle: "bold", fontSize: 8 },
-        alternateRowStyles: { fillColor: [235, 243, 255] },
-      });
-    }
+    };
 
-    // Footer
+    // Single PDF with both blocks on separate pages
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const cardio1 = prog.cardio ? (prog.cardio.block1 || []) : [];
+    const running1 = prog.running ? (prog.running.block1 || []) : [];
+    buildBlockPDF(doc, prog.block1, 1, "Sett. 1-2", cardio1, running1);
+
+    const cardio2 = prog.cardio ? (prog.cardio.block2 || []) : [];
+    const running2 = prog.running ? (prog.running.block2 || []) : [];
+    buildBlockPDF(doc, prog.block2, 2, "Sett. 3-4", cardio2, running2);
+
+    // Remove blank first page
+    doc.deletePage(1);
+
+    // Footer on all pages
+    const W = doc.internal.pageSize.getWidth();
+    const H = doc.internal.pageSize.getHeight();
     const pages = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pages; i++) {
       doc.setPage(i);
-      doc.setFontSize(7);
-      doc.setTextColor(80, 100, 140);
-      doc.text(`TrainForge Pro · ${prog.clientName || "Client"} · Blocco ${prog.monthNumber || 1}`, margin, H - 5);
-      doc.text(`${i}/${pages}`, W - margin, H - 5, { align: "right" });
+      doc.setFontSize(7); doc.setTextColor(80, 100, 140);
+      doc.text(`TrainForge Pro · ${clientName} · Blocco ${monthNum}`, 12, H - 5);
+      doc.text(`${i}/${pages}`, W - 12, H - 5, { align: "right" });
     }
 
-    const filename = `${(prog.clientName || "Client").replace(/\s+/g, "_")}_Blocco${prog.monthNumber || 1}.pdf`;
-    doc.save(filename);
+    doc.save(`${clientName.replace(/\s+/g, "_")}_Blocco${monthNum}.pdf`);
     notify("PDF exported!");
     } catch (err) { console.error("PDF error:", err); notify("PDF error: " + err.message, "warn"); }
   };
