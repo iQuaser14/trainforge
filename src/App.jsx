@@ -409,7 +409,7 @@ function generateDay(dayType, phaseCfg, durationCfg, block, usedExercises, locat
       notes = phaseCfg.tempo || "";
     }
 
-    exercises.push({ ...ex, section: "Strength", sets, reps, rest, weight, rpe, notes: notes.trim() });
+    exercises.push({ ...ex, section: "Strength", sets: sets || 3, reps: reps || "8", rest: rest || 90, weight, rpe, notes: notes.trim() });
     usedExercises.add(ex.id);
   };
 
@@ -971,7 +971,7 @@ function addProg(prgs, cId, p) { const a = prgs[cId] ? [...prgs[cId]] : []; a.pu
 function updProg(prgs, cId, p) { return { ...prgs, [cId]: (prgs[cId] || []).map(x => x.id === p.id ? p : x) }; }
 
 // ─── PDF HISTORICAL PROGRAMS ───
-const ex = (id, name, section, sets, reps, rest, weight, rpe, notes) => ({ id, name, category: section === "Warm-Up" ? "mobility" : section === "Core" ? "core" : section === "Finisher" ? "hiit" : "compound", section, sets, reps, rest: parseInt(rest) || 0, weight: weight || "—", rpe: rpe || "", notes: notes || "" });
+const ex = (id, name, section, sets, reps, rest, weight, rpe, notes) => ({ id, name, category: section === "Warm-Up" ? "mobility" : section === "Core" ? "core" : section === "Finisher" ? "hiit" : "compound", section, sets: sets || "", reps: reps || "", rest: parseInt(rest) || 0, weight: weight || "—", rpe: rpe || "", notes: notes || "" });
 
 const REDINI_B1 = {
   id: "prog_r1", clientId: "cl5", clientName: "Redini", level: "intermediate", monthNumber: 1, sessionsPerWeek: 3, sessionDuration: 75, trainingLocation: "gym", createdAt: "2025-09-01T10:00:00Z",
@@ -1500,7 +1500,8 @@ const supaFetch = (path, { method = "GET", body, prefer } = {}) =>
 const clToDb = c => ({ id: c.id, name: c.name, email: c.email || "", phone: c.phone || "", level: c.level, month_number: c.monthNumber || 1, sessions_per_week: c.sessionsPerWeek || 3, session_duration: c.sessionDuration || 60, day3_type: c.day3Type || "glute", training_location: c.trainingLocation || "gym", cardio_days_per_week: c.cardioDaysPerWeek || 0, goals: c.goals || "", health_notes: c.healthNotes || "", injuries: c.injuries || [], includes_running: c.includesRunning || false, start_date: c.startDate || "", status: c.status || "active" });
 const clFromDb = r => ({ id: r.id, name: r.name, email: r.email, phone: r.phone, level: r.level, monthNumber: r.month_number, sessionsPerWeek: r.sessions_per_week, sessionDuration: r.session_duration, day3Type: r.day3_type, trainingLocation: r.training_location, cardioDaysPerWeek: r.cardio_days_per_week, goals: r.goals, healthNotes: r.health_notes, injuries: r.injuries, includesRunning: r.includes_running, startDate: r.start_date, status: r.status });
 const prToDb = p => ({ id: p.id, client_id: p.clientId, client_name: p.clientName, level: p.level, month_number: p.monthNumber, sessions_per_week: p.sessionsPerWeek || 3, session_duration: p.sessionDuration || 60, training_location: p.trainingLocation || "gym", includes_running: p.includesRunning || false, cardio_days_per_week: p.cardioDaysPerWeek || 0, block1: p.block1, block2: p.block2, cardio: p.cardio || null, running: p.running || null, level_cfg: p.levelCfg || null, duration_cfg: p.durationCfg || null, created_at: p.createdAt });
-const prFromDb = r => { const mn = r.month_number || 1; const phases = ["foundation","hypertrophy","strength","deload"]; const ph = { foundation: "Foundation", hypertrophy: "Hypertrophy", strength: "Strength", deload: "Deload" }[phases[(mn - 1) % 4]] || ""; return { id: r.id, clientId: r.client_id, clientName: r.client_name, level: r.level, monthNumber: mn, sessionsPerWeek: r.sessions_per_week, sessionDuration: r.session_duration, trainingLocation: r.training_location, includesRunning: r.includes_running, cardioDaysPerWeek: r.cardio_days_per_week, block1: r.block1, block2: r.block2, cardio: r.cardio, running: r.running, levelCfg: r.level_cfg, durationCfg: r.duration_cfg, createdAt: r.created_at, phase: ph }; };
+const sanitizeExercises = (block) => { if (!block || !Array.isArray(block)) return block; return block.map(day => ({ ...day, exercises: (day.exercises || []).map(ex => ({ ...ex, sets: (ex.sets !== undefined && ex.sets !== null && String(ex.sets) !== "undefined") ? ex.sets : "", reps: (ex.reps !== undefined && ex.reps !== null && String(ex.reps) !== "undefined") ? ex.reps : "", weight: ex.weight || "—", rpe: ex.rpe || "", notes: ex.notes || "", rest: ex.rest || 0 })) })); };
+const prFromDb = r => { const mn = r.month_number || 1; const phases = ["foundation","hypertrophy","strength","deload"]; const ph = { foundation: "Foundation", hypertrophy: "Hypertrophy", strength: "Strength", deload: "Deload" }[phases[(mn - 1) % 4]] || ""; return { id: r.id, clientId: r.client_id, clientName: r.client_name, level: r.level, monthNumber: mn, sessionsPerWeek: r.sessions_per_week, sessionDuration: r.session_duration, trainingLocation: r.training_location, includesRunning: r.includes_running, cardioDaysPerWeek: r.cardio_days_per_week, block1: sanitizeExercises(r.block1), block2: sanitizeExercises(r.block2), cardio: r.cardio, running: r.running, levelCfg: r.level_cfg, durationCfg: r.duration_cfg, createdAt: r.created_at, phase: ph }; };
 const dbLoad = table => supaFetch(`${table}?select=*&order=${table === "clients" ? "name" : "created_at"}`);
 const dbSave = (table, data) => supaFetch(table, { method: "POST", body: data, prefer: "return=representation,resolution=merge-duplicates" });
 const dbDelete = (table, id) => supaFetch(`${table}?id=eq.${id}`, { method: "DELETE" });
@@ -1674,8 +1675,8 @@ export default function App() {
             } else if (ei === 0 && ex.section) { lastSection = ex.section; }
 
             const name = (ex.name || "") + (ex.circuit ? " (" + ex.circuit.join(", ") + ")" : "");
-            const sets = (ex.sets != null && String(ex.sets) !== "undefined") ? String(ex.sets) : "";
-            const reps = (ex.reps != null && String(ex.reps) !== "undefined") ? String(ex.reps) : "";
+            const sets = (ex.sets !== undefined && ex.sets !== null && ex.sets !== "" && String(ex.sets) !== "undefined" && String(ex.sets) !== "null") ? String(ex.sets) : "";
+            const reps = (ex.reps !== undefined && ex.reps !== null && ex.reps !== "" && String(ex.reps) !== "undefined" && String(ex.reps) !== "null") ? String(ex.reps) : "";
             const weight = ex.weight || "—";
             const rest = fmtRest(ex.rest);
             const notes = ex.notes || "";
