@@ -1668,32 +1668,34 @@ export default function App() {
 
             if (ex.section && ex.section !== lastSection && ex.section !== "Warm-Up") {
               if (lastSection !== "" || ei > 0) {
-                rows.push([{ content: ex.section.toUpperCase(), colSpan: 5, styles: { fillColor: [25, 50, 110], textColor: [130, 200, 255], fontStyle: "bold", fontSize: 7, cellPadding: 1.5 } }]);
+                rows.push([{ content: ex.section.toUpperCase(), colSpan: 6, styles: { fillColor: [25, 50, 110], textColor: [130, 200, 255], fontStyle: "bold", fontSize: 7, cellPadding: 1.5 } }]);
               }
               lastSection = ex.section;
             } else if (ei === 0 && ex.section) { lastSection = ex.section; }
 
             const name = (ex.name || "") + (ex.circuit ? " (" + ex.circuit.join(", ") + ")" : "");
-            const sr = fmtSR(ex);
+            const sets = (ex.sets != null && String(ex.sets) !== "undefined") ? String(ex.sets) : "";
+            const reps = (ex.reps != null && String(ex.reps) !== "undefined") ? String(ex.reps) : "";
             const weight = ex.weight || "—";
             const rest = fmtRest(ex.rest);
             const notes = ex.notes || "";
-            rows.push([name || "", sr || "", weight || "—", rest || "", notes || ""]);
+            rows.push([name || "", sets, reps, weight || "—", rest || "", notes || ""]);
           }
 
           autoTable(doc, {
             startY: y, margin: { left: margin, right: margin },
-            head: [["Esercizio", "Serie×Rep", "Carico", "Rec.", "Note"]],
+            head: [["Esercizio", "Serie", "Rep", "Carico", "Rec.", "Note"]],
             body: rows, theme: "grid",
             styles: { fontSize: 8, cellPadding: 2, lineColor: [220, 220, 225], lineWidth: 0.2 },
             headStyles: { fillColor: headerBg, textColor: white, fontStyle: "bold", fontSize: 8 },
             alternateRowStyles: { fillColor: rowAlt },
             columnStyles: {
-              0: { cellWidth: 75, fontStyle: "bold" },
-              1: { cellWidth: 30, halign: "center" },
-              2: { cellWidth: 30, halign: "center" },
-              3: { cellWidth: 20, halign: "center" },
-              4: { cellWidth: "auto", fontStyle: "italic", fontSize: 7, textColor: [60, 80, 120] },
+              0: { cellWidth: 70, fontStyle: "bold" },
+              1: { cellWidth: 18, halign: "center" },
+              2: { cellWidth: 24, halign: "center" },
+              3: { cellWidth: 28, halign: "center" },
+              4: { cellWidth: 18, halign: "center" },
+              5: { cellWidth: "auto", fontStyle: "italic", fontSize: 7, textColor: [60, 80, 120] },
             },
           });
           y = doc.lastAutoTable.finalY + 8;
