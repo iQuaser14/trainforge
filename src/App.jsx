@@ -21,6 +21,11 @@ const EXERCISES = {
     { id: "m14", name: "90/90 Hip Stretch", category: "mobility", equipment: "none", focus: "B" },
     { id: "m15", name: "Scapular Push-Ups", category: "mobility", equipment: "none", focus: "A" },
     { id: "m16", name: "Inchworms", category: "mobility", equipment: "none", focus: "both" },
+    { id: "m17", name: "Prayer Stretch", category: "mobility", equipment: "none", focus: "both" },
+    { id: "m18", name: "Scorpion Twist", category: "mobility", equipment: "none", focus: "both" },
+    { id: "m19", name: "Windmill", category: "mobility", equipment: "none", focus: "both" },
+    { id: "m20", name: "Adductor Rocks", category: "mobility", equipment: "none", focus: "B" },
+    { id: "m21", name: "Goodmornings", category: "mobility", equipment: "none", focus: "B" },
   ],
   compound_push_squat: [
     { id: "cps1", name: "Back Squat", category: "compound", equipment: "barbell", muscles: ["quads", "glutes"], focus: "A" },
@@ -34,6 +39,12 @@ const EXERCISES = {
     { id: "cps9", name: "Leg Press 45°", category: "compound", equipment: "machine", muscles: ["quads", "glutes"], focus: "A" },
     { id: "cps10", name: "DB Floor Press", category: "compound", equipment: "dumbbells", muscles: ["chest", "triceps"], focus: "A" },
     { id: "cps11", name: "Push-Up", category: "compound", equipment: "none", muscles: ["chest", "triceps"], focus: "A" },
+    { id: "cps12", name: "Box Squat", category: "compound", equipment: "barbell", muscles: ["quads", "glutes"], focus: "A" },
+    { id: "cps13", name: "Shoulder Press 90°", category: "compound", equipment: "dumbbells", muscles: ["shoulders", "triceps"], focus: "A" },
+    { id: "cps14", name: "Z-Press", category: "compound", equipment: "dumbbells", muscles: ["shoulders", "core"], focus: "A" },
+    { id: "cps15", name: "Standing Press", category: "compound", equipment: "barbell", muscles: ["shoulders", "triceps"], focus: "A" },
+    { id: "cps16", name: "Kneeling Press", category: "compound", equipment: "dumbbells", muscles: ["shoulders", "core"], focus: "A" },
+    { id: "cps17", name: "Elevated Push-Ups", category: "compound", equipment: "none", muscles: ["chest", "triceps"], focus: "A" },
   ],
   compound_pull_hinge: [
     { id: "cph1", name: "Deadlift", category: "compound", equipment: "barbell", muscles: ["posterior chain"], focus: "B" },
@@ -46,6 +57,12 @@ const EXERCISES = {
     { id: "cph8", name: "Chin-Ups", category: "compound", equipment: "pull-up bar", muscles: ["back", "biceps"], focus: "B" },
     { id: "cph9", name: "DB Romanian Deadlift", category: "compound", equipment: "dumbbells", muscles: ["hamstrings", "glutes"], focus: "B" },
     { id: "cph10", name: "1-Arm DB Row", category: "compound", equipment: "dumbbell", muscles: ["back", "biceps"], focus: "B" },
+    { id: "cph11", name: "Gorilla Row", category: "compound", equipment: "dumbbells", muscles: ["back", "biceps"], focus: "B" },
+    { id: "cph12", name: "Dumbbell Bent-over Row", category: "compound", equipment: "dumbbells", muscles: ["back", "biceps"], focus: "B" },
+    { id: "cph13", name: "Seal Row", category: "compound", equipment: "dumbbells", muscles: ["back", "rear delts"], focus: "B" },
+    { id: "cph14", name: "Lat Machine", category: "compound", equipment: "cable", muscles: ["back", "biceps"], focus: "B" },
+    { id: "cph15", name: "Low Pulley", category: "compound", equipment: "cable", muscles: ["back", "biceps"], focus: "B" },
+    { id: "cph16", name: "Row Machine", category: "compound", equipment: "machine", muscles: ["back", "biceps"], focus: "B" },
   ],
   accessory_push_squat: [
     { id: "aps1", name: "Bulgarian Split Squat", category: "accessory", equipment: "dumbbells", muscles: ["quads", "glutes"], focus: "A" },
@@ -141,6 +158,12 @@ const EXERCISES = {
     { id: "h18", name: "DB Deadlift", category: "hiit", equipment: "dumbbells" },
     { id: "h19", name: "Reverse Lunges (Tempo)", category: "hiit", equipment: "dumbbells" },
     { id: "h20", name: "Plank Commando", category: "hiit", equipment: "none" },
+    { id: "h21", name: "Devil Press", category: "hiit", equipment: "dumbbells" },
+    { id: "h22", name: "Row Renegade", category: "hiit", equipment: "dumbbells" },
+    { id: "h23", name: "V-Up", category: "hiit", equipment: "none" },
+    { id: "h24", name: "GHD", category: "hiit", equipment: "GHD machine" },
+    { id: "h25", name: "Walking Lunges", category: "hiit", equipment: "dumbbells" },
+    { id: "h26", name: "Lateral Slamball", category: "hiit", equipment: "slamball" },
   ],
   running: [
     { id: "r1", name: "Easy Run", category: "running", equipment: "none" },
@@ -324,11 +347,14 @@ function generateDay(dayType, phaseCfg, durationCfg, block, usedExercises, locat
   const P = {}; Object.keys(EXERCISES).forEach(k => { P[k] = filterLoc(EXERCISES[k], location); });
   const isA = dayType === "A", isB = dayType === "B", isQ = dayType === "Q", isH = dayType === "H", isG = dayType === "G", isFB = dayType === "F";
 
-  // Warm-Up
-  const mobFocus = (isA || isQ) ? "A" : isB || isH ? "B" : "both";
-  pickRandom(P.mobility.filter(e => e.focus === "both" || e.focus === mobFocus), durationCfg.mobilityCount).forEach(ex => {
-    exercises.push({ ...ex, section: "Warm-Up", sets: 2, reps: "10 each", rest: 0, weight: "BW", rpe: "", notes: "" });
-  });
+  // Fixed Warm-Up
+  const warmUp = [
+    { id: "m4", name: "Cat-Cow", category: "mobility", section: "Warm-Up", sets: 1, reps: "10", rest: 0, weight: "BW", rpe: "", notes: "" },
+    { id: "m5", name: "World's Greatest Stretch", category: "mobility", section: "Warm-Up", sets: 1, reps: "8/side", rest: 0, weight: "BW", rpe: "", notes: "" },
+    { id: "m_9090", name: "90/90 Hip Stretch", category: "mobility", section: "Warm-Up", sets: 1, reps: "5/side", rest: 0, weight: "BW", rpe: "", notes: "" },
+    { id: "m_inch", name: "Inchworms", category: "mobility", section: "Warm-Up", sets: 1, reps: "5", rest: 0, weight: "BW", rpe: "", notes: "" },
+  ];
+  warmUp.forEach(ex => exercises.push({ ...ex }));
 
   // Try to reuse a previous exercise with progression, or pick fresh
   const pickWithProgression = (pool, n, isCompound) => {
@@ -1737,9 +1763,18 @@ export default function App() {
     const [exPk, setExPk] = useState(null);
     const cb = ab === 0 ? p.block1 : p.block2;
     const cd = cb[ad];
-    const upEx = (di, ei, fld, val) => { const bk = ab === 0 ? "block1" : "block2"; const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = [...np[bk][di].exercises]; np[bk][di].exercises[ei] = { ...np[bk][di].exercises[ei], [fld]: val }; setP(np); };
-    const rmEx = (di, ei) => { const bk = ab === 0 ? "block1" : "block2"; const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = np[bk][di].exercises.filter((_, i) => i !== ei); setP(np); };
-    const repEx = (di, ei, nx) => { const bk = ab === 0 ? "block1" : "block2"; const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = [...np[bk][di].exercises]; const o = np[bk][di].exercises[ei]; np[bk][di].exercises[ei] = { ...nx, section: o.section, sets: o.sets, reps: o.reps, rest: o.rest, weight: o.weight, rpe: o.rpe, notes: o.notes || "" }; setP(np); setExPk(null); };
+    // Auto-sync Block1 edits → Block2 with micro-progression
+    const syncBlock2 = (np) => {
+      if (!np.block1) return np;
+      np.block2 = np.block1.map(day => ({
+        ...day,
+        exercises: microProgress(day.exercises, np.level || "intermediate")
+      }));
+      return np;
+    };
+    const upEx = (di, ei, fld, val) => { const bk = ab === 0 ? "block1" : "block2"; const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = [...np[bk][di].exercises]; np[bk][di].exercises[ei] = { ...np[bk][di].exercises[ei], [fld]: val }; if (ab === 0) syncBlock2(np); setP(np); };
+    const rmEx = (di, ei) => { const bk = ab === 0 ? "block1" : "block2"; const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = np[bk][di].exercises.filter((_, i) => i !== ei); if (ab === 0) syncBlock2(np); setP(np); };
+    const repEx = (di, ei, nx) => { const bk = ab === 0 ? "block1" : "block2"; const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = [...np[bk][di].exercises]; const o = np[bk][di].exercises[ei]; np[bk][di].exercises[ei] = { ...nx, section: o.section, sets: o.sets, reps: o.reps, rest: o.rest, weight: o.weight, rpe: o.rpe, notes: o.notes || "" }; if (ab === 0) syncBlock2(np); setP(np); setExPk(null); };
     const sc = s => ({ "Warm-Up": "#6eb5ff", Strength: K.ac, Core: "#b388ff", Finisher: K.dg }[s] || K.tm);
     return (
       <div>
@@ -1752,7 +1787,7 @@ export default function App() {
         <div>{(() => { let ls = ""; return cd.exercises.map((ex, ei) => { const ss = ex.section !== ls; ls = ex.section; return (<div key={ei}>{ss && <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: ei > 0 ? 24 : 0, marginBottom: 10 }}><div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 3, height: 16, borderRadius: 2, background: sc(ex.section) }} /><span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: sc(ex.section) }}>{ex.section}</span></div><Btn v="ghost" sm onClick={() => setExPk({ di: ad, sec: ex.section })} icon={I.plus}>Add</Btn></div>}<div style={{ background: K.cd, border: "1px solid " + K.bd, borderRadius: 10, marginBottom: 6, padding: "10px 14px" }}><div style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto auto auto auto", gap: 8, alignItems: "center", fontSize: 13 }}><div style={{ color: K.tx, fontWeight: 500, cursor: "pointer" }} onClick={() => setExPk({ di: ad, sec: ex.section, idx: ei, rep: true })}>{ex.name}{ex.circuit && <span style={{ fontSize: 11, color: K.td, marginLeft: 6 }}>({ex.circuit.join(", ")})</span>}</div>{["sets","reps","rest","weight","rpe"].map(fld => <div key={fld} style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: fld === "reps" ? 65 : fld === "weight" ? 55 : 40 }}><span style={{ fontSize: 9, color: K.td, textTransform: "uppercase" }}>{fld}</span><input value={ex[fld]} onChange={e => upEx(ad, ei, fld, e.target.value)} style={{ width: fld === "reps" ? 70 : fld === "weight" ? 55 : 45, padding: "4px 6px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 5, color: K.tx, fontSize: 13, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>)}<button onClick={() => rmEx(ad, ei)} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 4, opacity: 0.6 }}>{I.trash}</button></div><input value={ex.notes || ""} onChange={e => upEx(ad, ei, "notes", e.target.value)} placeholder="Notes (e.g., tempo, cues, weight guidance...)" style={{ width: "100%", marginTop: 6, padding: "5px 10px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 5, color: K.tm, fontSize: 11, fontFamily: ff, outline: "none", boxSizing: "border-box" }} /></div></div>); }); })()}</div>
         {p.includesRunning && p.running && <div style={{ marginTop: 28 }}><div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}><div style={{ width: 3, height: 16, borderRadius: 2, background: K.ok }} /><span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: K.ok }}>Running</span></div>{(ab === 0 ? p.running.block1 : p.running.block2).map((r, i) => <Crd key={i} style={{ marginBottom: 8, padding: 14 }}><div style={{ display: "flex", justifyContent: "space-between" }}><div><span style={{ fontWeight: 600, color: K.tx, fontSize: 13 }}>{r.day}</span><span style={{ color: K.tm, fontSize: 12, marginLeft: 12 }}>{r.type} · {r.duration}</span></div><span style={{ fontSize: 12, color: K.td }}>{r.notes}</span></div></Crd>)}</div>}
         {p.cardio && <div style={{ marginTop: 28 }}><div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}><div style={{ width: 3, height: 16, borderRadius: 2, background: "#2ecc71" }} /><span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#2ecc71" }}>Cardio Programming</span></div>{(ab === 0 ? p.cardio.block1 : p.cardio.block2).map((c, i) => <Crd key={i} style={{ marginBottom: 8, padding: 14 }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}><div><span style={{ fontWeight: 600, color: K.tx, fontSize: 13 }}>{c.dayLabel}</span><span style={{ color: "#2ecc71", fontSize: 12, marginLeft: 10, fontWeight: 600 }}>{c.type}</span>{c.rpe && <span style={{ color: K.td, fontSize: 11, marginLeft: 8 }}>RPE {c.rpe}</span>}</div></div><div style={{ marginTop: 8, fontSize: 12, color: K.tm, display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px" }}><span style={{ color: K.td }}>Warm-up:</span><span>{c.warmup}</span><span style={{ color: K.td }}>Work:</span><span style={{ color: K.tx, fontWeight: 500 }}>{c.work}</span><span style={{ color: K.td }}>Cool-down:</span><span>{c.cooldown}</span></div></Crd>)}</div>}
-        {exPk && <ExPick section={exPk.sec} dayType={cd.dayType} location={p.trainingLocation || "gym"} onSelect={ex => { if (exPk.rep && exPk.idx != null) { repEx(exPk.di, exPk.idx, ex); } else { const bk = ab === 0 ? "block1" : "block2"; const np = { ...p }; np[bk] = [...np[bk]]; np[bk][exPk.di] = { ...np[bk][exPk.di] }; const exs = [...np[bk][exPk.di].exercises]; const ic = ex.category === "compound"; const lc = p.levelCfg; const ne = { ...ex, section: exPk.sec, sets: ic ? lc.compoundSets : lc.accessorySets, reps: ic ? lc.compoundReps : lc.accessoryReps, rest: ic ? lc.restCompound : lc.restAccessory, weight: "—", rpe: ic ? lc.compoundRPE : lc.accessoryRPE, notes: "" }; let ia = exs.length; for (let i = exs.length - 1; i >= 0; i--) { if (exs[i].section === exPk.sec) { ia = i + 1; break; } } exs.splice(ia, 0, ne); np[bk][exPk.di].exercises = exs; setP(np); setExPk(null); } }} onClose={() => setExPk(null)} />}
+        {exPk && <ExPick section={exPk.sec} dayType={cd.dayType} location={p.trainingLocation || "gym"} onSelect={ex => { if (exPk.rep && exPk.idx != null) { repEx(exPk.di, exPk.idx, ex); } else { const bk = ab === 0 ? "block1" : "block2"; const np = { ...p }; np[bk] = [...np[bk]]; np[bk][exPk.di] = { ...np[bk][exPk.di] }; const exs = [...np[bk][exPk.di].exercises]; const ic = ex.category === "compound"; const lc = p.levelCfg || {}; const ne = { ...ex, section: exPk.sec, sets: ic ? (lc.compoundSets || lc.cSets || 4) : (lc.accessorySets || lc.aSets || 3), reps: ic ? (lc.compoundReps || lc.cReps || "8") : (lc.accessoryReps || lc.aReps || "10"), rest: ic ? (lc.restCompound || lc.rest || 120) : (lc.restAccessory || lc.aRest || 90), weight: "—", rpe: ic ? (lc.compoundRPE || lc.cRPE || "") : (lc.accessoryRPE || lc.aRPE || ""), notes: "" }; let ia = exs.length; for (let i = exs.length - 1; i >= 0; i--) { if (exs[i].section === exPk.sec) { ia = i + 1; break; } } exs.splice(ia, 0, ne); np[bk][exPk.di].exercises = exs; if (ab === 0) syncBlock2(np); setP(np); setExPk(null); } }} onClose={() => setExPk(null)} />}
       </div>
     );
   }
