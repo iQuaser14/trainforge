@@ -356,107 +356,150 @@ function generateDay(dayType, phaseCfg, durationCfg, block, usedExercises, locat
   ];
   warmUp.forEach(ex => exercises.push({ ...ex }));
 
-  // Try to reuse a previous exercise with progression, or pick fresh
-  const pickWithProgression = (pool, n, isCompound) => {
-    const result = [];
-    const inc = isCompound ? phaseCfg.wInc : phaseCfg.wIncAcc;
+  // ─── STYLE-TRAINED TEMPLATES (from 35 real programs) ───
+  // Each slot defines: pool of exercise names (most-used first), isCompound flag
+  // The generator picks from these in order, carrying over from previous program when possible
+
+  const allStrength = [...P.compound_push_squat, ...P.compound_pull_hinge, ...P.accessory_push_squat, ...P.accessory_pull_hinge];
+  const findEx = (names) => {
+    for (const n of names) {
+      const found = allStrength.find(e => e.name.toLowerCase().includes(n.toLowerCase()) && !usedExercises.has(e.id));
+      if (found) return found;
+    }
+    return null;
+  };
+
+  // Check if previous program had this exercise (by partial name match)
+  const prevHas = (names) => {
+    const prevNames = Object.keys(prevExMap);
+    for (const n of names) {
+      const match = prevNames.find(pn => pn.includes(n.toLowerCase()));
+      if (match) return prevExMap[match];
+    }
+    return null;
+  };
+
+  const addEx = (names, isCompound) => {
+    // First try to carry over from previous program
+    const prev = prevHas(names);
+    const ex = findEx(names);
+    if (!ex) return;
+
     const sets = isCompound ? phaseCfg.cSets : phaseCfg.aSets;
     const reps = isCompound ? phaseCfg.cReps : phaseCfg.aReps;
     const rpe = isCompound ? phaseCfg.cRPE : phaseCfg.aRPE;
     const rest = isCompound ? phaseCfg.rest : phaseCfg.aRest;
+    const inc = isCompound ? phaseCfg.wInc : phaseCfg.wIncAcc;
 
-    // First: try to carry over exercises from previous program
-    const available = pool.filter(e => !usedExercises.has(e.id));
-    const carried = [];
-    const fresh = [];
-    available.forEach(e => {
-      const prev = prevExMap[e.name.toLowerCase()];
-      if (prev) carried.push({ ex: e, prev });
-      else fresh.push(e);
-    });
-
-    // Keep ~65% from previous, rotate ~35%
-    const keepCount = Math.ceil(n * 0.65);
-    const rotateCount = n - keepCount;
-
-    // Carry over with progression
-    const toKeep = carried.slice(0, keepCount);
-    toKeep.forEach(({ ex, prev }) => {
-      const newWeight = progressWeight(prev.weight, inc, isCompound);
-      const tempoNote = phaseCfg.tempo && !prev.notes?.includes("ecc") ? phaseCfg.tempo : "";
-      const notes = [prev.notes || "", tempoNote].filter(Boolean).join(" | ");
-      result.push({ ...ex, section: "Strength", sets, reps, rest, weight: newWeight, rpe, notes: notes.trim() });
-      usedExercises.add(ex.id);
-    });
-
-    // Fill remaining with fresh exercises
-    const needed = n - result.length;
-    if (needed > 0) {
-      const freshPicks = pickRandom(fresh.length >= needed ? fresh : available.filter(e => !usedExercises.has(e.id)), needed);
-      freshPicks.forEach(ex => {
-        // For new exercises, estimate starting weight from any similar previous exercise
-        const prevSimilar = Object.values(prevExMap).find(p => p.category === ex.category && p._dayType === dayType);
-        const startWeight = prevSimilar ? prevSimilar.weight : "—";
-        const tempoNote = phaseCfg.tempo ? phaseCfg.tempo : "";
-        result.push({ ...ex, section: "Strength", sets, reps, rest, weight: startWeight, rpe, notes: tempoNote || "NEW — adjust weight" });
-        usedExercises.add(ex.id);
-      });
+    let weight = "—";
+    let notes = "";
+    if (prev) {
+      weight = progressWeight(prev.weight, inc, isCompound);
+      notes = prev.notes || "";
+      if (phaseCfg.tempo && !notes.includes("ecc")) notes = [notes, phaseCfg.tempo].filter(Boolean).join(" | ");
+    } else {
+      notes = phaseCfg.tempo || "";
     }
-    return result;
+
+    exercises.push({ ...ex, section: "Strength", sets, reps, rest, weight, rpe, notes: notes.trim() });
+    usedExercises.add(ex.id);
   };
 
-  // Day-type specific exercise selection (same structure as before but with progression)
+  // ─── DAY TYPE TEMPLATES ───
+  // Based on analysis of Gabriele's 35 programs: typical exercise order per day type
+
   if (isQ) {
-    const quadPool = P.compound_push_squat.filter(e => e.muscles?.some(m => ["quads","glutes","core"].includes(m)));
-    const pushPool = P.compound_push_squat.filter(e => e.muscles?.some(m => ["chest","triceps","shoulders"].includes(m)));
-    pickWithProgression(quadPool, 1, true).forEach(e => exercises.push(e));
-    pickWithProgression(pushPool, 1, true).forEach(e => exercises.push(e));
-    const lungePool = P.accessory_push_squat.filter(e => e.muscles?.some(m => ["quads","glutes"].includes(m)));
-    const shoulderPool = P.accessory_push_squat.filter(e => e.muscles?.some(m => ["shoulders"].includes(m)));
-    const legCurlPool = P.accessory_pull_hinge.filter(e => e.muscles?.some(m => ["hamstrings"].includes(m)));
-    pickWithProgression(lungePool, 1, false).forEach(e => exercises.push(e));
-    pickWithProgression(shoulderPool, 1, false).forEach(e => exercises.push(e));
-    if (durationCfg.accessoryCount >= 3) pickWithProgression(legCurlPool, 1, false).forEach(e => exercises.push(e));
+    // Day Q: Back Squat → Lunge variant → Hip Thrust → Leg Curl/Calf → Shoulder press → Lateral raise
+    addEx(["Back Squat", "Box Squat", "Front Squat", "Goblet Squat"], true);
+    addEx(["Bulgarian Split Squat", "Reverse Lunge", "Walking Lunges", "Affondi"], false);
+    addEx(["Hip Thrust"], true);
+    if (durationCfg.accessoryCount >= 2) addEx(["Leg Curl", "Calf Raise", "Leg Extension"], false);
+    if (durationCfg.accessoryCount >= 3) addEx(["Shoulder Press 90°", "DB Shoulder Press", "Arnold Press", "Standing Press", "Kneeling Press"], false);
+    if (durationCfg.accessoryCount >= 4) addEx(["Alzate Laterali", "Lateral Raise", "Bicep Curl"], false);
   } else if (isH) {
-    const hingePool = P.compound_pull_hinge.filter(e => e.muscles?.some(m => ["posterior chain","hamstrings","glutes"].includes(m)));
-    const rowPool = P.compound_pull_hinge.filter(e => e.muscles?.some(m => ["back","biceps"].includes(m)));
-    pickWithProgression(hingePool, 1, true).forEach(e => exercises.push(e));
-    pickWithProgression(rowPool, 1, true).forEach(e => exercises.push(e));
-    if (location === "gym") { const puPool = P.compound_pull_hinge.filter(e => e.name.includes("Pull-Up") || e.name.includes("Chin-Up")); pickWithProgression(puPool, 1, true).forEach(e => exercises.push(e)); }
-    const accPool = P.accessory_pull_hinge.filter(e => e.muscles?.some(m => ["back","rear delts","glutes","hamstrings"].includes(m)));
-    pickWithProgression(accPool, Math.min(durationCfg.accessoryCount, 2), false).forEach(e => exercises.push(e));
+    // Day H: Deadlift/RDL → Leg Curl → Pull (Lat/Row) → Press/Lat Machine → Optional isolation
+    addEx(["Deadlift", "Romanian Deadlift", "RDL", "B-Stance RDL"], true);
+    addEx(["Leg Curl", "Hip Thrust"], false);
+    addEx(["Lat Machine", "Low Pulley", "Row Machine", "Chest Press"], false);
+    if (durationCfg.accessoryCount >= 2) addEx(["Lat Machine neutra", "Lat Machine", "Military Press", "1-Arm DB Row", "DB Row"], false);
+    if (durationCfg.accessoryCount >= 3) addEx(["Curl manubri", "Bicep Curl", "Tricipiti corda", "Tricipiti cavo", "Cable Triceps"], false);
   } else if (isG) {
-    const htPool = P.accessory_pull_hinge.filter(e => e.name.toLowerCase().includes("hip thrust") || e.name.toLowerCase().includes("glute bridge"));
-    pickWithProgression(htPool, 1, true).forEach(e => exercises.push(e));
-    const gluteAcc = [...P.accessory_pull_hinge.filter(e => e.name.includes("Single-Leg") || e.name.includes("Abductor") || e.name.includes("Kickback")), ...P.accessory_push_squat.filter(e => e.name.includes("Bulgarian") || e.name.includes("Reverse") || e.name.includes("Goblet"))];
-    pickWithProgression(gluteAcc, durationCfg.accessoryCount, false).forEach(e => exercises.push(e));
+    // Day G: Hip Thrust heavy → RDL/Lat → Hip machine/Push → Abductor → Upper accessory
+    addEx(["Hip Thrust"], true);
+    addEx(["RDL", "Romanian Deadlift", "B-Stance RDL", "Lat Machine"], false);
+    addEx(["Abductor", "Kickback", "Cable Pull"], false);
+    if (durationCfg.accessoryCount >= 2) addEx(["Push-Up", "Elevated Push-Up", "DB Bench", "Incline DB Press"], false);
+    if (durationCfg.accessoryCount >= 3) addEx(["Rematore", "Gorilla Row", "Dumbbell Bent-over Row", "Seal Row", "Row Machine"], false);
   } else if (isFB) {
-    const lowerPool = block % 2 === 0 ? P.compound_push_squat.filter(e => e.muscles?.some(m => ["quads","glutes","core"].includes(m))) : P.compound_pull_hinge.filter(e => e.muscles?.some(m => ["posterior chain","hamstrings","glutes"].includes(m)));
-    const upperPool = block % 2 === 0 ? P.compound_pull_hinge.filter(e => e.muscles?.some(m => ["back","biceps"].includes(m))) : P.compound_push_squat.filter(e => e.muscles?.some(m => ["chest","triceps","shoulders"].includes(m)));
-    pickWithProgression(lowerPool, 1, true).forEach(e => exercises.push(e));
-    pickWithProgression(upperPool, 1, true).forEach(e => exercises.push(e));
-    pickWithProgression([...P.accessory_push_squat, ...P.accessory_pull_hinge], durationCfg.accessoryCount, false).forEach(e => exercises.push(e));
-  } else {
-    // A/B split
-    const compPool = isA ? P.compound_push_squat : P.compound_pull_hinge;
-    const upperM = isA ? ["chest","triceps","shoulders"] : ["back","biceps"];
-    const lowerM = isA ? ["quads","glutes","core"] : ["posterior chain","hamstrings","glutes"];
-    pickWithProgression(compPool.filter(e => e.muscles?.some(m => lowerM.includes(m))), 1, true).forEach(e => exercises.push(e));
-    pickWithProgression(compPool.filter(e => e.muscles?.some(m => upperM.includes(m))), 1, true).forEach(e => exercises.push(e));
-    pickWithProgression(isA ? P.accessory_push_squat : P.accessory_pull_hinge, durationCfg.accessoryCount, false).forEach(e => exercises.push(e));
+    // Full Body: Squat/Hinge → Upper Push/Pull → Hip → Accessory
+    if (block % 2 === 0) {
+      addEx(["Back Squat", "Box Squat", "Front Squat"], true);
+      addEx(["Pull-Up", "Chin-Up", "Lat Machine"], true);
+    } else {
+      addEx(["Deadlift", "Romanian Deadlift", "RDL"], true);
+      addEx(["Bench Press", "DB Bench", "Incline DB Press"], true);
+    }
+    addEx(["Hip Thrust", "Bulgarian Split Squat"], false);
+    if (durationCfg.accessoryCount >= 2) addEx(["Shoulder Press 90°", "Arnold Press", "Alzate Laterali", "Standing Press"], false);
+    if (durationCfg.accessoryCount >= 3) addEx(["Leg Curl", "Calf Raise", "Curl manubri", "Tricipiti corda"], false);
+  } else if (isA) {
+    // Day A (Upper Push focus): Vertical Press → Pull-Up → Horizontal Push → Row → Optional iso
+    addEx(["Military Press", "Standing Press", "Z-Press", "Overhead Press", "Kneeling Press"], true);
+    addEx(["Pull-Up", "Chin-Up", "Pull-Ups assisted"], true);
+    addEx(["DB Bench Press", "Incline DB Press", "Bench Press", "Elevated Push-Up", "Chest Press"], false);
+    if (durationCfg.accessoryCount >= 2) addEx(["1-Arm DB Row", "Gorilla Row", "Dumbbell Bent-over Row", "Seal Row", "Row Machine", "Chest-Supported Row"], false);
+    if (durationCfg.accessoryCount >= 3) addEx(["Tricipiti corda", "French Press", "Tricipiti cavo", "Cable Triceps", "Curl manubri", "Bicep Curl"], false);
+  } else if (isB) {
+    // Day B (Upper Pull focus): Deadlift/Row → Pull-Up → Lat/Row → Press accessory → Arm iso
+    addEx(["Rematore Bilanciere", "Gorilla Row", "Dumbbell Bent-over Row", "Seal Row", "Row Machine"], true);
+    addEx(["Pull-Up", "Chin-Up", "Lat Machine"], true);
+    addEx(["Lat Machine neutra", "Low Pulley", "1-Arm DB Row", "DB Row"], false);
+    if (durationCfg.accessoryCount >= 2) addEx(["DB Shoulder Press", "Shoulder Press 90°", "Arnold Press", "Alzate Laterali"], false);
+    if (durationCfg.accessoryCount >= 3) addEx(["Curl manubri", "Bicep Curl", "Hammer Curl", "Face Pull"], false);
   }
 
-  // Core
-  pickRandom(P.core, durationCfg.coreCount).forEach(ex => {
-    exercises.push({ ...ex, section: "Core", sets: phaseCfg.coreSets, reps: phaseCfg.coreReps, rest: 45, weight: "BW", rpe: "", notes: "" });
+  // ─── CORE (Gabriele's paired format) ───
+  const coreTemplates = [
+    { name: "Hollow Hold + Side Plank", reps: "30s + 30s/side" },
+    { name: "Dead Bug + Plank Shoulder Taps", reps: "12 + 16" },
+    { name: "Russian Twist + Hollow Rocks", reps: "20 + 15" },
+    { name: "Plank Drag Through + V-Ups", reps: "12 + 10" },
+    { name: "Plank + Side Plank", reps: "30s + 30s/side" },
+    { name: "Dead Bug + Plank Reach", reps: "12 + 10" },
+    { name: "Hollow Body + Pallof Press", reps: "30s + 12" },
+    { name: "Plank Commando + Knee to Chest", reps: "12 + 16" },
+  ];
+  const coreCount = Math.min(durationCfg.coreCount, coreTemplates.length);
+  const corePicks = pickRandom(coreTemplates, coreCount);
+  corePicks.forEach((ct, i) => {
+    exercises.push({ id: "core_" + dayType + "_" + block + "_" + i, name: ct.name, category: "core", section: "Core", sets: phaseCfg.coreSets, reps: ct.reps, rest: 45, weight: "BW", rpe: "", notes: "" });
   });
 
-  // Finisher
-  const hiitExs = pickRandom(P.hiit, durationCfg.hiitCount);
-  const finFmt = location === "home" ? "AMRAP / Circuit" : "HIIT Circuit";
-  const finReps = phase === "deload" ? "30s on / 30s off" : (location === "home" ? "Circuit — see notes" : "40s on / 20s off");
-  const finRounds = phase === "deload" ? Math.max(2, durationCfg.hiitRounds - 1) : durationCfg.hiitRounds;
-  exercises.push({ id: "hiit_" + dayType + "_" + block + "_" + Math.random().toString(36).slice(2,6), name: finFmt, category: "hiit", section: "Finisher", sets: finRounds, reps: finReps, rest: 60, weight: "—", rpe: phase === "deload" ? "6-7" : "9", notes: "", circuit: hiitExs.map(e => e.name) });
+  // ─── FINISHER (Gabriele's EMOM/AMRAP/circuit style) ───
+  const finTemplates = {
+    gym: [
+      { name: "EMOM 9': 15 Wall Ball + 12 Burpees + 9 Row Cal", reps: "EMOM 9'", notes: "pacing: steady, no rest" },
+      { name: "AMRAP 9': 8 WB + 8 Box Jump + 8 DB Snatch", reps: "AMRAP 9'", notes: "4-5 round target" },
+      { name: "4RFT: 250m Run + 10 Burpees + 12 Russian Swing", reps: "4 rounds FT", notes: "" },
+      { name: "EMOM 12': 200m Row + 10 Burpees + 14 WB", reps: "EMOM 12'", notes: "" },
+      { name: "3RFT: 300m Row + 12 Sit-Up + 10 KB Swing", reps: "3 rounds FT", notes: "" },
+      { name: "EMOM 9': 8 Ski Cal + 6 Burpees + 6 DB Snatch", reps: "EMOM 9'", notes: "" },
+      { name: "E2MOM x4: 250m Row + 10 Box Jump Over", reps: "E2MOM x4", notes: "" },
+      { name: "AMRAP 7': 8 Kipping PU + 12 Air Squat + 10 Sit-Up", reps: "AMRAP 7'", notes: "" },
+      { name: "Circ 3R: 10 TRX Pull-Up + 10 Goblet Squat + 10 Russian Swing", reps: "3 rounds", notes: "rec 60s between rounds" },
+      { name: "5R: 200m Run + 8 Burpees + 6 Thruster", reps: "5 rounds FT", notes: "" },
+    ],
+    home: [
+      { name: "AMRAP 9': 10 Burpees + 15 Air Squat + 12 V-Ups", reps: "AMRAP 9'", notes: "" },
+      { name: "EMOM 9': 8 DB Snatch + 10 Lunges + 12 Sit-Ups", reps: "EMOM 9'", notes: "" },
+      { name: "4RFT: 10 Burpees + 15 Goblet Squat + 12 DB Row", reps: "4 rounds FT", notes: "" },
+      { name: "Tabata 4': Burpees + Mountain Climbers", reps: "20s on / 10s off x8", notes: "" },
+    ],
+  };
+  const finPool = finTemplates[location] || finTemplates.gym;
+  const fin = phase === "deload" ? { name: "Light Circuit: 3R easy pace", reps: "3 rounds", notes: "60s rest between exercises, RPE 6" } : pickRandom(finPool, 1)[0];
+  const finRounds = phase === "deload" ? 3 : durationCfg.hiitRounds;
+  exercises.push({ id: "fin_" + dayType + "_" + block + "_" + Math.random().toString(36).slice(2,6), name: fin.name, category: "hiit", section: "Finisher", sets: finRounds, reps: fin.reps, rest: 60, weight: "—", rpe: phase === "deload" ? "6" : "8-9", notes: fin.notes || "" });
 
   return exercises;
 }
