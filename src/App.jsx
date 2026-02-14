@@ -292,6 +292,12 @@ function getPhaseConfig(level, phase) {
   return (configs[level] || configs.intermediate)[phase] || configs.intermediate.foundation;
 }
 
+// Round weight: compounds to nearest 5kg, accessories to nearest 2kg
+function roundWeight(val, isCompound) {
+  const step = isCompound ? 5 : 2;
+  return Math.round(val / step) * step;
+}
+
 // Apply weight increment to a parsed weight
 function progressWeight(weightStr, increment, isCompound) {
   const parsed = parseWeight(weightStr);
@@ -301,8 +307,9 @@ function progressWeight(weightStr, increment, isCompound) {
     return "@" + Math.round(newPct) + "%";
   }
   const inc = parsed.perSide ? increment * 0.5 : increment;
-  const newVal = Math.max(0, parsed.value + inc);
-  return formatWeight({ ...parsed, value: newVal });
+  const raw = Math.max(0, parsed.value + inc);
+  const rounded = roundWeight(raw, isCompound);
+  return formatWeight({ ...parsed, value: rounded });
 }
 
 // Extract exercise map from a program's block2 (latest state) keyed by exercise name
@@ -327,15 +334,16 @@ function extractPrevExercises(prev) {
 function microProgress(exercises, level) {
   return exercises.map(ex => {
     if (ex.section !== "Strength") return { ...ex };
+    const isComp = ex.category === "compound" || ex.rest >= 120;
     const p = parseWeight(ex.weight);
     if (!p || p.isPercent) {
-      // For percentage-based, bump 2.5%
       if (p && p.isPercent) return { ...ex, weight: "@" + Math.min(95, Math.round(p.value + 2.5)) + "%" };
-      // For RPE-based, add +0.5 RPE or note
       return { ...ex, notes: (ex.notes ? ex.notes + " | " : "") + "push harder vs W1-2" };
     }
     const bump = p.perSide ? 0.5 : (level === "beginner" ? 1.25 : 2.5);
-    return { ...ex, weight: formatWeight({ ...p, value: p.value + bump }) };
+    const raw = p.value + bump;
+    const rounded = roundWeight(raw, isComp);
+    return { ...ex, weight: formatWeight({ ...p, value: rounded }) };
   });
 }
 
@@ -1626,14 +1634,14 @@ export default function App() {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
     doc.setTextColor(...white);
-    doc.text(`${prog.clientName} — Blocco ${prog.monthNumber}`, margin, 14);
+    doc.text(`${prog.clientName || "Client"} — Blocco ${prog.monthNumber || 1}`, margin, 14);
     doc.setFontSize(9);
     doc.setTextColor(...accentText);
-    doc.text(`${prog.level.toUpperCase()} · ${prog.sessionsPerWeek}x/week · ${prog.sessionDuration}min · ${prog.trainingLocation === "home" ? "Home Gym" : "Gym"}`, W - margin, 14, { align: "right" });
+    doc.text(`${(prog.level || "").toUpperCase()} · ${prog.sessionsPerWeek || 3}x/week · ${prog.sessionDuration || 60}min · ${prog.trainingLocation === "home" ? "Home Gym" : "Gym"}`, W - margin, 14, { align: "right" });
     y = 28;
 
-    const fmtSR = (ex) => ex ? `${ex.sets}×${ex.reps}` : "";
-    const fmtRest = (r) => { const n = parseInt(r); if (!n) return String(r || ""); return n >= 120 ? (n / 60) + "'" : n + "''"; };
+    const fmtSR = (ex) => { if (!ex) return ""; const s = (ex.sets != null && String(ex.sets) !== "undefined") ? ex.sets : ""; const r = (ex.reps != null && String(ex.reps) !== "undefined") ? ex.reps : ""; return (s || r) ? `${s}×${r}` : ""; };
+    const fmtRest = (r) => { if (r === undefined || r === null || r === "") return ""; const n = parseInt(r); if (!n || isNaN(n)) return String(r || ""); return n >= 120 ? (n / 60) + "'" : n + "''"; };
 
     // For each day, merge block1 and block2 into one table
     const numDays = Math.max(prog.block1.length, prog.block2.length);
@@ -1669,7 +1677,7 @@ export default function App() {
         if (!ex) continue;
 
         // Section separator
-        if (ex.section !== lastSection && ex.section !== "Warm-Up") {
+        if (ex.section && ex.section !== lastSection && ex.section !== "Warm-Up") {
           if (lastSection !== "" || ei > 0) {
             rows.push([{ content: ex.section.toUpperCase(), colSpan: 6, styles: { fillColor: [25, 50, 110], textColor: [130, 200, 255], fontStyle: "bold", fontSize: 7, cellPadding: 1.5 } }]);
           }
@@ -1678,14 +1686,14 @@ export default function App() {
           lastSection = ex.section;
         }
 
-        const name = ex.name + (ex.circuit ? " (" + ex.circuit.join(", ") + ")" : "");
+        const name = (ex.name || "") + (ex.circuit ? " (" + ex.circuit.join(", ") + ")" : "");
         const w12 = fmtSR(e1);
         const w34 = fmtSR(e2);
         const weight = (e1 || e2).weight || "—";
         const rest = fmtRest((e1 || e2).rest);
         const notes = (e1 || e2).notes || "";
 
-        rows.push([name, w12, w34, weight, rest, notes]);
+        rows.push([name || "", w12 || "", w34 || "", weight || "—", rest || "", notes || ""]);
       }
 
       autoTable(doc, {
@@ -1732,10 +1740,10 @@ export default function App() {
           const s = s1 || s2;
           cRows.push([
             s.dayLabel || ("Cardio " + (ci + 1)),
-            s1 ? s1.type : "",
-            s1 ? s1.work : "",
-            s2 ? s2.type : "",
-            s2 ? s2.work : "",
+            s1 ? (s1.type || "") : "",
+            s1 ? (s1.work || "") : "",
+            s2 ? (s2.type || "") : "",
+            s2 ? (s2.work || "") : "",
             s.rpe ? "RPE " + s.rpe : "",
           ]);
         }
@@ -1771,7 +1779,7 @@ export default function App() {
       const maxR = Math.max(r1.length, r2.length);
       for (let ri = 0; ri < maxR; ri++) {
         const s1 = r1[ri]; const s2 = r2[ri]; const s = s1 || s2;
-        rRows.push([s.day, s1 ? `${s1.type} · ${s1.duration}` : "", s1 ? s1.notes : "", s2 ? `${s2.type} · ${s2.duration}` : "", s2 ? s2.notes : ""]);
+        rRows.push([s.day || "", s1 ? `${s1.type || ""} · ${s1.duration || ""}` : "", s1 ? (s1.notes || "") : "", s2 ? `${s2.type || ""} · ${s2.duration || ""}` : "", s2 ? (s2.notes || "") : ""]);
       }
       autoTable(doc, {
         startY: y, margin: { left: margin, right: margin },
@@ -1789,11 +1797,11 @@ export default function App() {
       doc.setPage(i);
       doc.setFontSize(7);
       doc.setTextColor(80, 100, 140);
-      doc.text(`TrainForge Pro · ${prog.clientName} · Blocco ${prog.monthNumber}`, margin, H - 5);
+      doc.text(`TrainForge Pro · ${prog.clientName || "Client"} · Blocco ${prog.monthNumber || 1}`, margin, H - 5);
       doc.text(`${i}/${pages}`, W - margin, H - 5, { align: "right" });
     }
 
-    const filename = `${prog.clientName.replace(/\s+/g, "_")}_Blocco${prog.monthNumber}.pdf`;
+    const filename = `${(prog.clientName || "Client").replace(/\s+/g, "_")}_Blocco${prog.monthNumber || 1}.pdf`;
     doc.save(filename);
     notify("PDF exported!");
     } catch (err) { console.error("PDF error:", err); notify("PDF error: " + err.message, "warn"); }
@@ -1837,7 +1845,7 @@ export default function App() {
 
   function ExPick({ section, dayType, location, onSelect, onClose }) {
     const [ft, setFt] = useState("");
-    const getSectionCats = () => { if (section === "Warm-Up") return ["mobility"]; if (section === "Core") return ["core"]; if (section === "Finisher") return ["hiit"]; if (section === "Strength") { if (dayType === "A" || dayType === "Q") return ["compound_push_squat", "accessory_push_squat", "accessory_pull_hinge"]; if (dayType === "B" || dayType === "H") return ["compound_pull_hinge", "accessory_pull_hinge", "accessory_push_squat"]; return ["compound_push_squat", "compound_pull_hinge", "accessory_push_squat", "accessory_pull_hinge"]; } return Object.keys(EXERCISES); };
+    const getSectionCats = () => { if (section === "Warm-Up") return ["mobility"]; if (section === "Core") return ["core"]; if (section === "Finisher") return ["hiit"]; if (section === "Strength") return ["compound_push_squat", "compound_pull_hinge", "accessory_push_squat", "accessory_pull_hinge"]; return Object.keys(EXERCISES); };
     const fl = getSectionCats().flatMap(c => filterLoc(EXERCISES[c] || [], location || "gym")).filter(e => e.name.toLowerCase().includes(ft.toLowerCase()));
     return (<Mdl title={"Select — " + section} onClose={onClose} wide><div style={{ position: "relative", marginBottom: 16 }}><input value={ft} onChange={e => setFt(e.target.value)} placeholder="Search..." style={{ width: "100%", padding: "10px 14px 10px 36px", background: K.bg, border: "1px solid " + K.bd, borderRadius: 8, color: K.tx, fontSize: 13, fontFamily: ff, outline: "none", boxSizing: "border-box" }} /><div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: K.td }}>{I.search}</div></div><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, maxHeight: 400, overflowY: "auto" }}>{fl.map(ex => <div key={ex.id} onClick={() => onSelect(ex)} style={{ padding: "12px 14px", background: K.cd, border: "1px solid " + K.bd, borderRadius: 8, cursor: "pointer", transition: "all 0.12s" }} onMouseEnter={e => { e.currentTarget.style.borderColor = K.ac; e.currentTarget.style.background = K.ab; }} onMouseLeave={e => { e.currentTarget.style.borderColor = K.bd; e.currentTarget.style.background = K.cd; }}><div style={{ fontWeight: 600, fontSize: 13, color: K.tx, marginBottom: 4 }}>{ex.name}</div><div style={{ fontSize: 11, color: K.td }}>{ex.category}{ex.equipment ? " · " + ex.equipment : ""}{ex.muscles ? " · " + ex.muscles.join(", ") : ""}</div></div>)}</div></Mdl>);
   }
