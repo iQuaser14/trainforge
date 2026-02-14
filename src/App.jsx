@@ -1687,16 +1687,16 @@ export default function App() {
             startY: y, margin: { left: margin, right: margin },
             head: [["Esercizio", "Serie", "Rep", "Carico", "Rec.", "Note"]],
             body: rows, theme: "grid",
-            styles: { fontSize: 8, cellPadding: 2, lineColor: [220, 220, 225], lineWidth: 0.2 },
-            headStyles: { fillColor: headerBg, textColor: white, fontStyle: "bold", fontSize: 8 },
+            styles: { fontSize: 8, cellPadding: 2, lineColor: [220, 220, 225], lineWidth: 0.2, halign: "center" },
+            headStyles: { fillColor: headerBg, textColor: white, fontStyle: "bold", fontSize: 8, halign: "center" },
             alternateRowStyles: { fillColor: rowAlt },
             columnStyles: {
-              0: { cellWidth: 70, fontStyle: "bold" },
+              0: { cellWidth: 70, fontStyle: "bold", halign: "left" },
               1: { cellWidth: 18, halign: "center" },
               2: { cellWidth: 24, halign: "center" },
               3: { cellWidth: 28, halign: "center" },
               4: { cellWidth: 18, halign: "center" },
-              5: { cellWidth: "auto", fontStyle: "italic", fontSize: 7, textColor: [60, 80, 120] },
+              5: { cellWidth: "auto", fontStyle: "italic", fontSize: 7, textColor: [60, 80, 120], halign: "left" },
             },
           });
           y = doc.lastAutoTable.finalY + 8;
