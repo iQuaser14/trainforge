@@ -348,6 +348,7 @@ function microProgress(exercises, level) {
 }
 
 function pickRandom(arr, count) { const s = [...arr].sort(() => Math.random() - 0.5); return s.slice(0, Math.min(count, arr.length)); }
+function extractPrevIds(prev) { if (!prev) return new Set(); const ids = new Set(); [prev.block1, prev.block2].forEach(block => { if (!block) return; block.forEach(day => { if (!day.exercises) return; day.exercises.forEach(ex => { if (ex.section === "Strength") ids.add(ex.id); }); }); }); return ids; }
 function buildDaySchedule(spw, d3 = "glute") { if (spw === 3) return ["Q", "H", d3 === "glute" ? "G" : "F"]; const s = []; for (let i = 0; i < spw; i++) s.push(i % 2 === 0 ? "A" : "B"); return s; }
 
 function generateDay(dayType, phaseCfg, durationCfg, block, usedExercises, location, prevExMap, phase) {
@@ -1770,11 +1771,12 @@ export default function App() {
     } catch (err) { console.error("PDF error:", err); notify("PDF error: " + err.message, "warn"); }
   };
 
-  function ProgEdit({ program, onSave, onBack }) {
+  function ProgEdit({ program, prevProgram, onSave, onBack }) {
     const [p, setP] = useState(JSON.parse(JSON.stringify(program)));
     const [ab, setAb] = useState(0);
     const [ad, setAd] = useState(0);
     const [exPk, setExPk] = useState(null);
+    const [showCmp, setShowCmp] = useState(false);
     const cb = ab === 0 ? p.block1 : p.block2;
     const cd = cb[ad];
     // Auto-sync Block1 edits → Block2 with micro-progression
@@ -1790,17 +1792,104 @@ export default function App() {
     const rmEx = (di, ei) => { const bk = ab === 0 ? "block1" : "block2"; const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = np[bk][di].exercises.filter((_, i) => i !== ei); if (ab === 0) syncBlock2(np); setP(np); };
     const repEx = (di, ei, nx) => { const bk = ab === 0 ? "block1" : "block2"; const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = [...np[bk][di].exercises]; const o = np[bk][di].exercises[ei]; np[bk][di].exercises[ei] = { ...nx, section: o.section, sets: o.sets, reps: o.reps, rest: o.rest, weight: o.weight, rpe: o.rpe, notes: o.notes || "" }; if (ab === 0) syncBlock2(np); setP(np); setExPk(null); };
     const sc = s => ({ "Warm-Up": "#6eb5ff", Strength: K.ac, Core: "#b388ff", Finisher: K.dg }[s] || K.tm);
+
+    // Running edit helpers
+    const upRun = (bi, ri, fld, val) => {
+      const np = { ...p, running: { ...p.running } };
+      const bk = bi === 0 ? "block1" : "block2";
+      np.running[bk] = [...np.running[bk]];
+      np.running[bk][ri] = { ...np.running[bk][ri], [fld]: val };
+      setP(np);
+    };
+    const addRun = () => {
+      const np = { ...p };
+      if (!np.running) np.running = { block1: [], block2: [] };
+      else np.running = { ...np.running };
+      const bk = ab === 0 ? "block1" : "block2";
+      np.running[bk] = [...(np.running[bk] || []), { day: "Off-Day", type: "Easy Run", duration: "25 min", notes: "" }];
+      np.includesRunning = true;
+      setP(np);
+    };
+    const rmRun = (bi, ri) => {
+      const np = { ...p, running: { ...p.running } };
+      const bk = bi === 0 ? "block1" : "block2";
+      np.running[bk] = np.running[bk].filter((_, i) => i !== ri);
+      setP(np);
+    };
+
+    // Comparison: get previous program's exercises for current day
+    const getPrevDay = () => {
+      if (!prevProgram) return null;
+      const prevBlock = ab === 0 ? prevProgram.block1 : prevProgram.block2;
+      return prevBlock && prevBlock[ad] ? prevBlock[ad] : null;
+    };
+
     return (
       <div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}><button onClick={onBack} style={{ background: "none", border: "none", color: K.tm, cursor: "pointer", padding: 4 }}>{I.back}</button><div><h2 style={{ margin: 0, fontSize: 20, color: K.tx }}>{p.clientName}</h2><div style={{ fontSize: 12, color: K.tm, display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>Month {p.monthNumber} · <LvlBadge level={p.level} /><span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>{I.cal} {p.sessionsPerWeek}×/wk</span><span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>{I.clock} {p.sessionDuration}min</span>{p.trainingLocation === "home" && <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: "rgba(200,255,46,0.15)", color: K.ac }}>🏠 HOME</span>}{p.cardioDaysPerWeek > 0 && <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: "rgba(46,204,113,0.15)", color: "#2ecc71" }}>+{p.cardioDaysPerWeek} Cardio</span>}</div></div></div>
-          <div style={{ display: "flex", gap: 10 }}><Btn v="secondary" sm onClick={() => exportPDF(p)} icon={pdfIcon}>PDF</Btn><Btn v="secondary" sm onClick={() => { setP(JSON.parse(JSON.stringify(program))); notify("Reset", "warn"); }} icon={I.refresh}>Reset</Btn><Btn v="danger" sm onClick={() => setConfDelPr(p)} icon={I.trash}>Delete</Btn><Btn sm onClick={() => { onSave(p); notify("Saved!"); }}>Save</Btn></div>
+          <div style={{ display: "flex", gap: 10 }}>{prevProgram && <Btn v={showCmp ? "primary" : "secondary"} sm onClick={() => setShowCmp(!showCmp)} icon={I.history}>{showCmp ? "Hide" : "Compare"}</Btn>}<Btn v="secondary" sm onClick={() => exportPDF(p)} icon={pdfIcon}>PDF</Btn><Btn v="secondary" sm onClick={() => { setP(JSON.parse(JSON.stringify(program))); notify("Reset", "warn"); }} icon={I.refresh}>Reset</Btn><Btn v="danger" sm onClick={() => setConfDelPr(p)} icon={I.trash}>Delete</Btn><Btn sm onClick={() => { onSave(p); notify("Saved!"); }}>Save</Btn></div>
         </div>
         <div style={{ display: "flex", gap: 2, marginBottom: 16, background: K.sf, borderRadius: 10, padding: 3 }}>{["Block 1 — Weeks 1-2", "Block 2 — Weeks 3-4"].map((l, i) => <button key={i} onClick={() => { setAb(i); setAd(0); }} style={{ flex: 1, padding: "10px 16px", border: "none", borderRadius: 8, fontFamily: ff, fontSize: 13, fontWeight: 600, cursor: "pointer", background: ab === i ? K.ac : "transparent", color: ab === i ? "#0a0a0c" : K.tm }}>{l}</button>)}</div>
         <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>{cb.map((d, i) => <button key={i} onClick={() => setAd(i)} style={{ padding: "8px 16px", border: "1px solid " + (ad === i ? K.ac : K.bd), borderRadius: 8, fontFamily: ff, fontSize: 12, fontWeight: 600, cursor: "pointer", background: ad === i ? K.ab : "transparent", color: ad === i ? K.ac : K.tm }}>{d.dayLabel} · {d.focus}</button>)}</div>
-        <div>{(() => { let ls = ""; return cd.exercises.map((ex, ei) => { const ss = ex.section !== ls; ls = ex.section; return (<div key={ei}>{ss && <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: ei > 0 ? 24 : 0, marginBottom: 10 }}><div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 3, height: 16, borderRadius: 2, background: sc(ex.section) }} /><span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: sc(ex.section) }}>{ex.section}</span></div><Btn v="ghost" sm onClick={() => setExPk({ di: ad, sec: ex.section })} icon={I.plus}>Add</Btn></div>}<div style={{ background: K.cd, border: "1px solid " + K.bd, borderRadius: 10, marginBottom: 6, padding: "10px 14px" }}><div style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto auto auto auto", gap: 8, alignItems: "center", fontSize: 13 }}><div style={{ color: K.tx, fontWeight: 500, cursor: "pointer" }} onClick={() => setExPk({ di: ad, sec: ex.section, idx: ei, rep: true })}>{ex.name}{ex.circuit && <span style={{ fontSize: 11, color: K.td, marginLeft: 6 }}>({ex.circuit.join(", ")})</span>}</div>{["sets","reps","rest","weight","rpe"].map(fld => <div key={fld} style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: fld === "reps" ? 65 : fld === "weight" ? 55 : 40 }}><span style={{ fontSize: 9, color: K.td, textTransform: "uppercase" }}>{fld}</span><input value={ex[fld]} onChange={e => upEx(ad, ei, fld, e.target.value)} style={{ width: fld === "reps" ? 70 : fld === "weight" ? 55 : 45, padding: "4px 6px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 5, color: K.tx, fontSize: 13, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>)}<button onClick={() => rmEx(ad, ei)} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 4, opacity: 0.6 }}>{I.trash}</button></div><input value={ex.notes || ""} onChange={e => upEx(ad, ei, "notes", e.target.value)} placeholder="Notes (e.g., tempo, cues, weight guidance...)" style={{ width: "100%", marginTop: 6, padding: "5px 10px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 5, color: K.tm, fontSize: 11, fontFamily: ff, outline: "none", boxSizing: "border-box" }} /></div></div>); }); })()}</div>
-        {p.includesRunning && p.running && <div style={{ marginTop: 28 }}><div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}><div style={{ width: 3, height: 16, borderRadius: 2, background: K.ok }} /><span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: K.ok }}>Running</span></div>{(ab === 0 ? p.running.block1 : p.running.block2).map((r, i) => <Crd key={i} style={{ marginBottom: 8, padding: 14 }}><div style={{ display: "flex", justifyContent: "space-between" }}><div><span style={{ fontWeight: 600, color: K.tx, fontSize: 13 }}>{r.day}</span><span style={{ color: K.tm, fontSize: 12, marginLeft: 12 }}>{r.type} · {r.duration}</span></div><span style={{ fontSize: 12, color: K.td }}>{r.notes}</span></div></Crd>)}</div>}
-        {p.cardio && <div style={{ marginTop: 28 }}><div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}><div style={{ width: 3, height: 16, borderRadius: 2, background: "#2ecc71" }} /><span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#2ecc71" }}>Cardio Programming</span></div>{(ab === 0 ? p.cardio.block1 : p.cardio.block2).map((c, i) => <Crd key={i} style={{ marginBottom: 8, padding: 14 }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}><div><span style={{ fontWeight: 600, color: K.tx, fontSize: 13 }}>{c.dayLabel}</span><span style={{ color: "#2ecc71", fontSize: 12, marginLeft: 10, fontWeight: 600 }}>{c.type}</span>{c.rpe && <span style={{ color: K.td, fontSize: 11, marginLeft: 8 }}>RPE {c.rpe}</span>}</div></div><div style={{ marginTop: 8, fontSize: 12, color: K.tm, display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px" }}><span style={{ color: K.td }}>Warm-up:</span><span>{c.warmup}</span><span style={{ color: K.td }}>Work:</span><span style={{ color: K.tx, fontWeight: 500 }}>{c.work}</span><span style={{ color: K.td }}>Cool-down:</span><span>{c.cooldown}</span></div></Crd>)}</div>}
+
+        <div style={{ display: "flex", gap: 16 }}>
+          {/* Comparison panel */}
+          {showCmp && prevProgram && (() => {
+            const prevDay = getPrevDay();
+            const prevExs = prevDay ? (prevDay.exercises || []).filter(e => e.section === "Strength") : [];
+            return (<div style={{ width: 280, flexShrink: 0 }}>
+              <div style={{ background: K.sf, borderRadius: 10, padding: 14, position: "sticky", top: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: K.tm, textTransform: "uppercase", marginBottom: 12 }}>Previous — Month {prevProgram.monthNumber}</div>
+                {prevExs.length === 0 ? <div style={{ fontSize: 12, color: K.td }}>No matching day</div> :
+                prevExs.map((ex, i) => {
+                  const currEx = cd.exercises.find(e => e.name === ex.name && e.section === "Strength");
+                  const currW = currEx ? parseWeight(currEx.weight) : null;
+                  const prevW = parseWeight(ex.weight);
+                  const progressed = currW && prevW && !currW.isPercent && !prevW.isPercent && currW.value > prevW.value;
+                  const same = currEx != null;
+                  return (<div key={i} style={{ padding: "8px 10px", borderRadius: 6, marginBottom: 4, background: same ? "rgba(200,255,46,0.06)" : "transparent", borderLeft: "3px solid " + (same ? (progressed ? "#2ecc71" : K.ac) : K.bd) }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: same ? K.tx : K.td }}>{ex.name}</div>
+                    <div style={{ fontSize: 11, color: K.td, marginTop: 2 }}>
+                      {ex.sets || ""}×{ex.reps || ""} · {ex.weight || "—"}{ex.rpe ? " RPE " + ex.rpe : ""}
+                      {progressed && <span style={{ color: "#2ecc71", marginLeft: 6 }}>↑</span>}
+                    </div>
+                  </div>);
+                })}
+                {prevProgram.running && <div style={{ marginTop: 12, borderTop: "1px solid " + K.bd, paddingTop: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: K.ok, marginBottom: 6 }}>RUNNING</div>
+                  {(ab === 0 ? prevProgram.running.block1 : prevProgram.running.block2 || []).map((r, i) => <div key={i} style={{ fontSize: 11, color: K.td, marginBottom: 4 }}>{r.day}: {r.type} · {r.duration}</div>)}
+                </div>}
+              </div>
+            </div>);
+          })()}
+
+          {/* Main editor */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div>{(() => { let ls = ""; return cd.exercises.map((ex, ei) => { const ss = ex.section !== ls; ls = ex.section; return (<div key={ei}>{ss && <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: ei > 0 ? 24 : 0, marginBottom: 10 }}><div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 3, height: 16, borderRadius: 2, background: sc(ex.section) }} /><span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: sc(ex.section) }}>{ex.section}</span></div><Btn v="ghost" sm onClick={() => setExPk({ di: ad, sec: ex.section })} icon={I.plus}>Add</Btn></div>}<div style={{ background: K.cd, border: "1px solid " + K.bd, borderRadius: 10, marginBottom: 6, padding: "10px 14px" }}><div style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto auto auto auto", gap: 8, alignItems: "center", fontSize: 13 }}><div style={{ color: K.tx, fontWeight: 500, cursor: "pointer" }} onClick={() => setExPk({ di: ad, sec: ex.section, idx: ei, rep: true })}>{ex.name}{ex.circuit && <span style={{ fontSize: 11, color: K.td, marginLeft: 6 }}>({ex.circuit.join(", ")})</span>}</div>{["sets","reps","rest","weight","rpe"].map(fld => <div key={fld} style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: fld === "reps" ? 65 : fld === "weight" ? 55 : 40 }}><span style={{ fontSize: 9, color: K.td, textTransform: "uppercase" }}>{fld}</span><input value={ex[fld]} onChange={e => upEx(ad, ei, fld, e.target.value)} style={{ width: fld === "reps" ? 70 : fld === "weight" ? 55 : 45, padding: "4px 6px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 5, color: K.tx, fontSize: 13, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>)}<button onClick={() => rmEx(ad, ei)} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 4, opacity: 0.6 }}>{I.trash}</button></div><input value={ex.notes || ""} onChange={e => upEx(ad, ei, "notes", e.target.value)} placeholder="Notes (e.g., tempo, cues, weight guidance...)" style={{ width: "100%", marginTop: 6, padding: "5px 10px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 5, color: K.tm, fontSize: 11, fontFamily: ff, outline: "none", boxSizing: "border-box" }} /></div></div>); }); })()}</div>
+
+            {/* Editable Running Section */}
+            <div style={{ marginTop: 28 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 3, height: 16, borderRadius: 2, background: K.ok }} /><span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: K.ok }}>Running</span></div>
+                <Btn v="ghost" sm onClick={addRun} icon={I.plus}>Add</Btn>
+              </div>
+              {p.running && (ab === 0 ? p.running.block1 : p.running.block2 || []).map((r, ri) => (
+                <div key={ri} style={{ background: K.cd, border: "1px solid " + K.bd, borderRadius: 10, marginBottom: 6, padding: "10px 14px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: 8, alignItems: "center" }}>
+                    {["day","type","duration"].map(fld => <div key={fld} style={{ display: "flex", flexDirection: "column" }}><span style={{ fontSize: 9, color: K.td, textTransform: "uppercase", marginBottom: 2 }}>{fld}</span><input value={r[fld] || ""} onChange={e => upRun(ab, ri, fld, e.target.value)} style={{ padding: "5px 8px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 5, color: K.tx, fontSize: 12, fontFamily: ff, outline: "none" }} /></div>)}
+                    <button onClick={() => rmRun(ab, ri)} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 4, opacity: 0.6, alignSelf: "end", marginBottom: 2 }}>{I.trash}</button>
+                  </div>
+                  <input value={r.notes || ""} onChange={e => upRun(ab, ri, "notes", e.target.value)} placeholder="Notes..." style={{ width: "100%", marginTop: 6, padding: "5px 10px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 5, color: K.tm, fontSize: 11, fontFamily: ff, outline: "none", boxSizing: "border-box" }} />
+                </div>
+              ))}
+              {(!p.running || !(ab === 0 ? p.running.block1 : p.running.block2 || []).length) && <div style={{ fontSize: 12, color: K.td, padding: 10 }}>No running days. Click + Add to create one.</div>}
+            </div>
+
+            {p.cardio && <div style={{ marginTop: 28 }}><div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}><div style={{ width: 3, height: 16, borderRadius: 2, background: "#2ecc71" }} /><span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#2ecc71" }}>Cardio Programming</span></div>{(ab === 0 ? p.cardio.block1 : p.cardio.block2).map((c, i) => <Crd key={i} style={{ marginBottom: 8, padding: 14 }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}><div><span style={{ fontWeight: 600, color: K.tx, fontSize: 13 }}>{c.dayLabel}</span><span style={{ color: "#2ecc71", fontSize: 12, marginLeft: 10, fontWeight: 600 }}>{c.type}</span>{c.rpe && <span style={{ color: K.td, fontSize: 11, marginLeft: 8 }}>RPE {c.rpe}</span>}</div></div><div style={{ marginTop: 8, fontSize: 12, color: K.tm, display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px" }}><span style={{ color: K.td }}>Warm-up:</span><span>{c.warmup}</span><span style={{ color: K.td }}>Work:</span><span style={{ color: K.tx, fontWeight: 500 }}>{c.work}</span><span style={{ color: K.td }}>Cool-down:</span><span>{c.cooldown}</span></div></Crd>)}</div>}
+          </div>
+        </div>
+
         {exPk && <ExPick section={exPk.sec} dayType={cd.dayType} location={p.trainingLocation || "gym"} onSelect={ex => { if (exPk.rep && exPk.idx != null) { repEx(exPk.di, exPk.idx, ex); } else { const bk = ab === 0 ? "block1" : "block2"; const np = { ...p }; np[bk] = [...np[bk]]; np[bk][exPk.di] = { ...np[bk][exPk.di] }; const exs = [...np[bk][exPk.di].exercises]; const ic = ex.category === "compound"; const lc = p.levelCfg || {}; const ne = { ...ex, section: exPk.sec, sets: ic ? (lc.compoundSets || lc.cSets || 4) : (lc.accessorySets || lc.aSets || 3), reps: ic ? (lc.compoundReps || lc.cReps || "8") : (lc.accessoryReps || lc.aReps || "10"), rest: ic ? (lc.restCompound || lc.rest || 120) : (lc.restAccessory || lc.aRest || 90), weight: "—", rpe: ic ? (lc.compoundRPE || lc.cRPE || "") : (lc.accessoryRPE || lc.aRPE || ""), notes: "" }; let ia = exs.length; for (let i = exs.length - 1; i >= 0; i--) { if (exs[i].section === exPk.sec) { ia = i + 1; break; } } exs.splice(ia, 0, ne); np[bk][exPk.di].exercises = exs; if (ab === 0) syncBlock2(np); setP(np); setExPk(null); } }} onClose={() => setExPk(null)} />}
       </div>
     );
@@ -1866,7 +1955,7 @@ export default function App() {
   function Clients() {
     const [histCl, setHistCl] = useState(null);
     const fl = cls.filter(c => c.name.toLowerCase().includes(sq.toLowerCase()) || c.level.includes(sq.toLowerCase()));
-    if (selCl && selPr) return <ProgEdit program={selPr} onSave={u => { setPrgs(updProg(prgs, u.clientId, u)); setSelPr(u); dbSave("programs", prToDb(u)).catch(console.error); }} onBack={() => setSelPr(null)} />;
+    if (selCl && selPr) { const allPr = getAll(prgs, selCl.id); const prIdx = allPr.findIndex(x => x.id === selPr.id); const prevPr = prIdx > 0 ? allPr[prIdx - 1] : null; return <ProgEdit program={selPr} prevProgram={prevPr} onSave={u => { setPrgs(updProg(prgs, u.clientId, u)); setSelPr(u); dbSave("programs", prToDb(u)).catch(console.error); }} onBack={() => setSelPr(null)} />; }
     if (selCl && histCl) return <ProgHistory client={selCl} programs={getAll(prgs, selCl.id)} onSelectProgram={p => { setSelPr(p); setHistCl(null); }} onBack={() => setHistCl(null)} />;
     if (selCl) {
       const c = selCl, cp = getLatest(prgs, c.id), allP = getAll(prgs, c.id);
@@ -1902,7 +1991,7 @@ export default function App() {
   }
 
   function Programs() {
-    if (selPr) return <ProgEdit program={selPr} onSave={u => { setPrgs(updProg(prgs, u.clientId, u)); setSelPr(u); dbSave("programs", prToDb(u)).catch(console.error); }} onBack={() => setSelPr(null)} />;
+    if (selPr) { const allPr = getAll(prgs, selPr.clientId); const prIdx = allPr.findIndex(x => x.id === selPr.id); const prevPr = prIdx > 0 ? allPr[prIdx - 1] : null; return <ProgEdit program={selPr} prevProgram={prevPr} onSave={u => { setPrgs(updProg(prgs, u.clientId, u)); setSelPr(u); dbSave("programs", prToDb(u)).catch(console.error); }} onBack={() => setSelPr(null)} />; }
     const all = Object.entries(prgs).flatMap(([, arr]) => arr).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     return (<div><div style={{ marginBottom: 24 }}><h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: K.tx }}>Programs</h1><p style={{ margin: "6px 0 0", color: K.tm, fontSize: 14 }}>{all.length} programs</p></div>{all.length === 0 ? <Crd style={{ textAlign: "center", padding: 40 }}><div style={{ color: K.td, fontSize: 14 }}>No programs yet.</div></Crd> : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>{all.map(p => <Crd key={p.id} onClick={() => setSelPr(p)} style={{ cursor: "pointer" }}><div style={{ fontWeight: 600, color: K.tx, fontSize: 15, marginBottom: 6 }}>{p.clientName}</div><div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}><LvlBadge level={p.level} /><span style={{ fontSize: 12, color: K.tm }}>Mo.{p.monthNumber} · {p.sessionsPerWeek}×/wk · {p.sessionDuration}min</span></div><div style={{ fontSize: 12, color: K.td }}>{p.block1.reduce((a, d) => a + d.exercises.length, 0) + p.block2.reduce((a, d) => a + d.exercises.length, 0)} exercises · {new Date(p.createdAt).toLocaleDateString()}</div></Crd>)}</div>}</div>);
   }
