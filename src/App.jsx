@@ -935,8 +935,7 @@ RULES:
                       <div><span style={{ color: K.tm }}>Sessions:</span> {r.client?.sessionsPerWeek}×/wk · {r.client?.sessionDuration}min</div>
                       <div><span style={{ color: K.tm }}>Block 1:</span> {(r.program?.block1 || []).length} days · {(r.program?.block1 || []).reduce((a, d) => a + (d.exercises?.length || 0), 0)} exercises</div>
                       {(r.program?.block2 || []).length > 0 && <div><span style={{ color: K.tm }}>Block 2:</span> {r.program.block2.length} days · {r.program.block2.reduce((a, d) => a + (d.exercises?.length || 0), 0)} exercises</div>}
-                      {r.program?.cardio && <div><span style={{ color: K.tm }}>Cardio:</span> Included</div>}
-                      {r.program?.running && <div><span style={{ color: K.tm }}>Running:</span> Included</div>}
+                      {r.program?.cardio && <div><span style={{ color: K.tm }}>Running:</span> Included</div>}
                     </div>
                   )}
                   {!r._ok && <div style={{ fontSize: 12, color: K.dg, marginTop: 6 }}>{r._err}</div>}
@@ -1601,7 +1600,7 @@ export default function App() {
         <div style={{ background: K.ab, border: "1px solid " + K.ac + "30", borderRadius: 8, padding: 12, marginBottom: 14 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: K.ac, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Weekly Split Preview</div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{buildDaySchedule(f.sessionsPerWeek, f.day3Type || "glute").map((t, i) => { const labels = { A: "Push+Squat", B: "Pull+Hinge", Q: "Quad+Push", H: "Hinge+Pull", G: "Glute Focus", F: "Full Body" }; const colors = { A: "#5dade2", B: "#f0a030", Q: "#5dade2", H: "#f0a030", G: "#e74c3c", F: "#2ecc71" }; return <span key={i} style={{ padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, background: colors[t] + "25", color: colors[t] }}>Day {i+1}: {labels[t]}</span>; })}</div>
-          {(f.cardioDaysPerWeek || 0) > 0 && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>{Array.from({ length: f.cardioDaysPerWeek }, (_, i) => <span key={"c"+i} style={{ padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, background: "rgba(46,204,113,0.15)", color: "#2ecc71" }}>Cardio {i+1}</span>)}</div>}
+          {(f.cardioDaysPerWeek || 0) > 0 && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>{Array.from({ length: f.cardioDaysPerWeek }, (_, i) => <span key={"c"+i} style={{ padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, background: "rgba(46,204,113,0.15)", color: "#2ecc71" }}>Running {i+1}</span>)}</div>}
           <div style={{ fontSize: 11, color: K.td, marginTop: 6 }}>{f.trainingLocation === "home" ? "🏠 Home" : "🏋️ Gym"} · {f.sessionDuration} min · {(f.sessionsPerWeek || 3) + (f.cardioDaysPerWeek || 0)} total days/week</div>
         </div>
         <Inp label="Goals" value={f.goals} onChange={v => setF({ ...f, goals: v })} textarea placeholder="Strength, weight loss, muscle tone..." />
@@ -1624,7 +1623,7 @@ export default function App() {
     const clientName = prog.clientName || "Client";
     const monthNum = prog.monthNumber || 1;
 
-    const buildBlockPDF = (doc, blockData, blockNum, weekLabel, cardioData, runningData) => {
+    const buildBlockPDF = (doc, blockData, blockNum, weekLabel, cardioData) => {
       const W = doc.internal.pageSize.getWidth();
       const H = doc.internal.pageSize.getHeight();
       const margin = 12;
@@ -1710,9 +1709,9 @@ export default function App() {
         doc.setFillColor(25, 50, 110);
         doc.rect(margin, y, W - margin * 2, 8, "F");
         doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(255, 255, 255);
-        doc.text("CARDIO", margin + 4, y + 5.5);
+        doc.text("RUNNING", margin + 4, y + 5.5);
         y += 10;
-        const cRows = cardioData.map((s, i) => [s.dayLabel || ("Cardio " + (i+1)), s.type || "", s.work || "", s.rpe ? "RPE " + s.rpe : ""]);
+        const cRows = cardioData.map((s, i) => [s.dayLabel || ("Running " + (i+1)), s.type || "", s.work || "", s.rpe ? "RPE " + s.rpe : ""]);
         autoTable(doc, {
           startY: y, margin: { left: margin, right: margin },
           head: [["Day", "Type", "Work", "RPE"]], body: cRows, theme: "grid",
@@ -1723,34 +1722,15 @@ export default function App() {
         y = doc.lastAutoTable.finalY + 8;
       }
 
-      // Running
-      if (runningData && runningData.length > 0) {
-        if (y + 30 > H - 10) { doc.addPage(); y = margin; }
-        doc.setFillColor(25, 50, 110);
-        doc.rect(margin, y, W - margin * 2, 8, "F");
-        doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(255, 255, 255);
-        doc.text("RUNNING", margin + 4, y + 5.5);
-        y += 10;
-        const rRows = runningData.map(s => [s.day || "", `${s.type || ""} · ${s.duration || ""}`, s.notes || ""]);
-        autoTable(doc, {
-          startY: y, margin: { left: margin, right: margin },
-          head: [["Day", "Session", "Notes"]], body: rRows, theme: "grid",
-          styles: { fontSize: 8, cellPadding: 2, lineColor: [220, 220, 225], lineWidth: 0.2 },
-          headStyles: { fillColor: headerBg, textColor: white, fontStyle: "bold", fontSize: 8 },
-          alternateRowStyles: { fillColor: rowAlt },
-        });
-      }
     };
 
     // Single PDF with both blocks on separate pages
     const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
     const cardio1 = prog.cardio ? (prog.cardio.block1 || []) : [];
-    const running1 = prog.running ? (prog.running.block1 || []) : [];
-    buildBlockPDF(doc, prog.block1, 1, "Sett. 1-2", cardio1, running1);
+    buildBlockPDF(doc, prog.block1, 1, "Sett. 1-2", cardio1);
 
     const cardio2 = prog.cardio ? (prog.cardio.block2 || []) : [];
-    const running2 = prog.running ? (prog.running.block2 || []) : [];
-    buildBlockPDF(doc, prog.block2, 2, "Sett. 3-4", cardio2, running2);
+    buildBlockPDF(doc, prog.block2, 2, "Sett. 3-4", cardio2);
 
     // Remove blank first page
     doc.deletePage(1);
@@ -1793,27 +1773,27 @@ export default function App() {
     const repEx = (di, ei, nx) => { const bk = ab === 0 ? "block1" : "block2"; const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = [...np[bk][di].exercises]; const o = np[bk][di].exercises[ei]; np[bk][di].exercises[ei] = { ...nx, section: o.section, sets: o.sets, reps: o.reps, rest: o.rest, weight: o.weight, rpe: o.rpe, notes: o.notes || "" }; if (ab === 0) syncBlock2(np); setP(np); setExPk(null); };
     const sc = s => ({ "Warm-Up": "#6eb5ff", Strength: K.ac, Core: "#b388ff", Finisher: K.dg }[s] || K.tm);
 
-    // Running edit helpers
+    // Running (uses cardio data structure) edit helpers
     const upRun = (bi, ri, fld, val) => {
-      const np = { ...p, running: { ...p.running } };
+      const np = { ...p, cardio: { ...(p.cardio || { block1: [], block2: [] }) } };
       const bk = bi === 0 ? "block1" : "block2";
-      np.running[bk] = [...np.running[bk]];
-      np.running[bk][ri] = { ...np.running[bk][ri], [fld]: val };
+      np.cardio[bk] = [...(np.cardio[bk] || [])];
+      np.cardio[bk][ri] = { ...np.cardio[bk][ri], [fld]: val };
       setP(np);
     };
     const addRun = () => {
       const np = { ...p };
-      if (!np.running) np.running = { block1: [], block2: [] };
-      else np.running = { ...np.running };
+      if (!np.cardio) np.cardio = { block1: [], block2: [] };
+      else np.cardio = { ...np.cardio };
       const bk = ab === 0 ? "block1" : "block2";
-      np.running[bk] = [...(np.running[bk] || []), { day: "Off-Day", type: "Easy Run", duration: "25 min", notes: "" }];
-      np.includesRunning = true;
+      np.cardio[bk] = [...(np.cardio[bk] || []), { dayLabel: "Day 4", type: "Easy Run", warmup: "5'", work: "30' Z2", cooldown: "5'", rpe: "5" }];
       setP(np);
     };
     const rmRun = (bi, ri) => {
-      const np = { ...p, running: { ...p.running } };
+      const np = { ...p, cardio: { ...(p.cardio || { block1: [], block2: [] }) } };
       const bk = bi === 0 ? "block1" : "block2";
-      np.running[bk] = np.running[bk].filter((_, i) => i !== ri);
+      np.cardio[bk] = (np.cardio[bk] || []).filter((_, i) => i !== ri);
+      if (np.cardio.block1.length === 0 && np.cardio.block2.length === 0) np.cardio = null;
       setP(np);
     };
 
@@ -1827,7 +1807,7 @@ export default function App() {
     return (
       <div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}><button onClick={onBack} style={{ background: "none", border: "none", color: K.tm, cursor: "pointer", padding: 4 }}>{I.back}</button><div><h2 style={{ margin: 0, fontSize: 20, color: K.tx }}>{p.clientName}</h2><div style={{ fontSize: 12, color: K.tm, display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>Month {p.monthNumber} · <LvlBadge level={p.level} /><span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>{I.cal} {p.sessionsPerWeek}×/wk</span><span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>{I.clock} {p.sessionDuration}min</span>{p.trainingLocation === "home" && <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: "rgba(200,255,46,0.15)", color: K.ac }}>🏠 HOME</span>}{p.cardioDaysPerWeek > 0 && <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: "rgba(46,204,113,0.15)", color: "#2ecc71" }}>+{p.cardioDaysPerWeek} Cardio</span>}</div></div></div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}><button onClick={onBack} style={{ background: "none", border: "none", color: K.tm, cursor: "pointer", padding: 4 }}>{I.back}</button><div><h2 style={{ margin: 0, fontSize: 20, color: K.tx }}>{p.clientName}</h2><div style={{ fontSize: 12, color: K.tm, display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>Month {p.monthNumber} · <LvlBadge level={p.level} /><span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>{I.cal} {p.sessionsPerWeek}×/wk</span><span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>{I.clock} {p.sessionDuration}min</span>{p.trainingLocation === "home" && <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: "rgba(200,255,46,0.15)", color: K.ac }}>🏠 HOME</span>}{p.cardioDaysPerWeek > 0 && <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: "rgba(46,204,113,0.15)", color: "#2ecc71" }}>+{p.cardioDaysPerWeek} Running</span>}</div></div></div>
           <div style={{ display: "flex", gap: 10 }}>{prevProgram && <Btn v={showCmp ? "primary" : "secondary"} sm onClick={() => setShowCmp(!showCmp)} icon={I.history}>{showCmp ? "Hide" : "Compare"}</Btn>}<Btn v="secondary" sm onClick={() => exportPDF(p)} icon={pdfIcon}>PDF</Btn><Btn v="secondary" sm onClick={() => { setP(JSON.parse(JSON.stringify(program))); notify("Reset", "warn"); }} icon={I.refresh}>Reset</Btn><Btn v="danger" sm onClick={() => setConfDelPr(p)} icon={I.trash}>Delete</Btn><Btn sm onClick={() => { onSave(p); notify("Saved!"); }}>Save</Btn></div>
         </div>
         <div style={{ display: "flex", gap: 2, marginBottom: 16, background: K.sf, borderRadius: 10, padding: 3 }}>{["Block 1 — Weeks 1-2", "Block 2 — Weeks 3-4"].map((l, i) => <button key={i} onClick={() => { setAb(i); setAd(0); }} style={{ flex: 1, padding: "10px 16px", border: "none", borderRadius: 8, fontFamily: ff, fontSize: 13, fontWeight: 600, cursor: "pointer", background: ab === i ? K.ac : "transparent", color: ab === i ? "#0a0a0c" : K.tm }}>{l}</button>)}</div>
@@ -1856,9 +1836,9 @@ export default function App() {
                     </div>
                   </div>);
                 })}
-                {prevProgram.running && <div style={{ marginTop: 12, borderTop: "1px solid " + K.bd, paddingTop: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: K.ok, marginBottom: 6 }}>RUNNING</div>
-                  {(ab === 0 ? prevProgram.running.block1 : prevProgram.running.block2 || []).map((r, i) => <div key={i} style={{ fontSize: 11, color: K.td, marginBottom: 4 }}>{r.day}: {r.type} · {r.duration}</div>)}
+                {prevProgram.cardio && <div style={{ marginTop: 12, borderTop: "1px solid " + K.bd, paddingTop: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#2ecc71", marginBottom: 6 }}>RUNNING</div>
+                  {(ab === 0 ? prevProgram.cardio.block1 : prevProgram.cardio.block2 || []).map((r, i) => <div key={i} style={{ fontSize: 11, color: K.td, marginBottom: 4 }}>{r.dayLabel}: {r.type} · {r.work}</div>)}
                 </div>}
               </div>
             </div>);
@@ -1868,25 +1848,25 @@ export default function App() {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div>{(() => { let ls = ""; return cd.exercises.map((ex, ei) => { const ss = ex.section !== ls; ls = ex.section; return (<div key={ei}>{ss && <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: ei > 0 ? 24 : 0, marginBottom: 10 }}><div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 3, height: 16, borderRadius: 2, background: sc(ex.section) }} /><span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: sc(ex.section) }}>{ex.section}</span></div><Btn v="ghost" sm onClick={() => setExPk({ di: ad, sec: ex.section })} icon={I.plus}>Add</Btn></div>}<div style={{ background: K.cd, border: "1px solid " + K.bd, borderRadius: 10, marginBottom: 6, padding: "10px 14px" }}><div style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto auto auto auto", gap: 8, alignItems: "center", fontSize: 13 }}><div style={{ color: K.tx, fontWeight: 500, cursor: "pointer" }} onClick={() => setExPk({ di: ad, sec: ex.section, idx: ei, rep: true })}>{ex.name}{ex.circuit && <span style={{ fontSize: 11, color: K.td, marginLeft: 6 }}>({ex.circuit.join(", ")})</span>}</div>{["sets","reps","rest","weight","rpe"].map(fld => <div key={fld} style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: fld === "reps" ? 65 : fld === "weight" ? 55 : 40 }}><span style={{ fontSize: 9, color: K.td, textTransform: "uppercase" }}>{fld}</span><input value={ex[fld]} onChange={e => upEx(ad, ei, fld, e.target.value)} style={{ width: fld === "reps" ? 70 : fld === "weight" ? 55 : 45, padding: "4px 6px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 5, color: K.tx, fontSize: 13, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>)}<button onClick={() => rmEx(ad, ei)} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 4, opacity: 0.6 }}>{I.trash}</button></div><input value={ex.notes || ""} onChange={e => upEx(ad, ei, "notes", e.target.value)} placeholder="Notes (e.g., tempo, cues, weight guidance...)" style={{ width: "100%", marginTop: 6, padding: "5px 10px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 5, color: K.tm, fontSize: 11, fontFamily: ff, outline: "none", boxSizing: "border-box" }} /></div></div>); }); })()}</div>
 
-            {/* Editable Running Section */}
+            {/* Editable Running Section (uses cardio data) */}
             <div style={{ marginTop: 28 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 3, height: 16, borderRadius: 2, background: K.ok }} /><span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: K.ok }}>Running</span></div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 3, height: 16, borderRadius: 2, background: "#2ecc71" }} /><span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#2ecc71" }}>Running</span></div>
                 <Btn v="ghost" sm onClick={addRun} icon={I.plus}>Add</Btn>
               </div>
-              {p.running && (ab === 0 ? p.running.block1 : p.running.block2 || []).map((r, ri) => (
+              {p.cardio && (ab === 0 ? p.cardio.block1 : p.cardio.block2 || []).map((c, ri) => (
                 <div key={ri} style={{ background: K.cd, border: "1px solid " + K.bd, borderRadius: 10, marginBottom: 6, padding: "10px 14px" }}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: 8, alignItems: "center" }}>
-                    {["day","type","duration"].map(fld => <div key={fld} style={{ display: "flex", flexDirection: "column" }}><span style={{ fontSize: 9, color: K.td, textTransform: "uppercase", marginBottom: 2 }}>{fld}</span><input value={r[fld] || ""} onChange={e => upRun(ab, ri, fld, e.target.value)} style={{ padding: "5px 8px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 5, color: K.tx, fontSize: 12, fontFamily: ff, outline: "none" }} /></div>)}
+                    {["dayLabel","type","rpe"].map(fld => <div key={fld} style={{ display: "flex", flexDirection: "column" }}><span style={{ fontSize: 9, color: K.td, textTransform: "uppercase", marginBottom: 2 }}>{fld === "dayLabel" ? "Day" : fld === "rpe" ? "RPE" : fld}</span><input value={c[fld] || ""} onChange={e => upRun(ab, ri, fld, e.target.value)} style={{ padding: "5px 8px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 5, color: K.tx, fontSize: 12, fontFamily: ff, outline: "none", textAlign: fld === "rpe" ? "center" : "left" }} /></div>)}
                     <button onClick={() => rmRun(ab, ri)} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 4, opacity: 0.6, alignSelf: "end", marginBottom: 2 }}>{I.trash}</button>
                   </div>
-                  <input value={r.notes || ""} onChange={e => upRun(ab, ri, "notes", e.target.value)} placeholder="Notes..." style={{ width: "100%", marginTop: 6, padding: "5px 10px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 5, color: K.tm, fontSize: 11, fontFamily: ff, outline: "none", boxSizing: "border-box" }} />
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr 1fr", gap: 8, marginTop: 8 }}>
+                    {["warmup","work","cooldown"].map(fld => <div key={fld} style={{ display: "flex", flexDirection: "column" }}><span style={{ fontSize: 9, color: K.td, textTransform: "uppercase", marginBottom: 2 }}>{fld === "warmup" ? "Warm-up" : fld === "cooldown" ? "Cool-down" : "Work"}</span><input value={c[fld] || ""} onChange={e => upRun(ab, ri, fld, e.target.value)} style={{ padding: "5px 8px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 5, color: fld === "work" ? K.tx : K.tm, fontSize: 12, fontFamily: ff, fontWeight: fld === "work" ? 600 : 400, outline: "none" }} /></div>)}
+                  </div>
                 </div>
               ))}
-              {(!p.running || !(ab === 0 ? p.running.block1 : p.running.block2 || []).length) && <div style={{ fontSize: 12, color: K.td, padding: 10 }}>No running days. Click + Add to create one.</div>}
+              {(!p.cardio || !(ab === 0 ? p.cardio.block1 : p.cardio.block2 || []).length) && <div style={{ fontSize: 12, color: K.td, padding: 10 }}>No running days. Click + Add to create one.</div>}
             </div>
-
-            {p.cardio && <div style={{ marginTop: 28 }}><div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}><div style={{ width: 3, height: 16, borderRadius: 2, background: "#2ecc71" }} /><span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#2ecc71" }}>Cardio Programming</span></div>{(ab === 0 ? p.cardio.block1 : p.cardio.block2).map((c, i) => <Crd key={i} style={{ marginBottom: 8, padding: 14 }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}><div><span style={{ fontWeight: 600, color: K.tx, fontSize: 13 }}>{c.dayLabel}</span><span style={{ color: "#2ecc71", fontSize: 12, marginLeft: 10, fontWeight: 600 }}>{c.type}</span>{c.rpe && <span style={{ color: K.td, fontSize: 11, marginLeft: 8 }}>RPE {c.rpe}</span>}</div></div><div style={{ marginTop: 8, fontSize: 12, color: K.tm, display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px" }}><span style={{ color: K.td }}>Warm-up:</span><span>{c.warmup}</span><span style={{ color: K.td }}>Work:</span><span style={{ color: K.tx, fontWeight: 500 }}>{c.work}</span><span style={{ color: K.td }}>Cool-down:</span><span>{c.cooldown}</span></div></Crd>)}</div>}
           </div>
         </div>
 
@@ -1929,7 +1909,7 @@ export default function App() {
                     <div style={{ color: K.td }}>{I.chevron}</div>
                   </div>
                   {prev && <div style={{ marginTop: 12, display: "flex", gap: 16, fontSize: 11 }}>{diff.added.length > 0 && <span style={{ color: K.ok }}>+{diff.added.length} new</span>}{diff.removed.length > 0 && <span style={{ color: K.dg }}>-{diff.removed.length} rotated out</span>}{diff.kept.length > 0 && <span style={{ color: K.tm }}>{diff.kept.length} kept</span>}</div>}
-                  <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>{prog.block1?.map((d, di) => <span key={di} style={{ padding: "3px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: K.ac + "15", color: K.ac }}>{d.dayLabel}: {d.focus}</span>)}{prog.cardioDaysPerWeek > 0 && <span style={{ padding: "3px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: "rgba(46,204,113,0.15)", color: "#2ecc71" }}>+{prog.cardioDaysPerWeek} Cardio</span>}</div>
+                  <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>{prog.block1?.map((d, di) => <span key={di} style={{ padding: "3px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: K.ac + "15", color: K.ac }}>{d.dayLabel}: {d.focus}</span>)}{prog.cardioDaysPerWeek > 0 && <span style={{ padding: "3px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: "rgba(46,204,113,0.15)", color: "#2ecc71" }}>+{prog.cardioDaysPerWeek} Running</span>}</div>
                 </Crd>
               </div>
             );
@@ -1985,7 +1965,7 @@ export default function App() {
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}><div><h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: K.tx }}>Clients</h1><p style={{ margin: "6px 0 0", color: K.tm, fontSize: 14 }}>{actCls.length} active</p></div><div style={{ display: "flex", gap: 10 }}><Btn v="secondary" onClick={() => setShowImport(true)} icon={I.upload}>Import</Btn><Btn onClick={() => { setEditCl(null); setShowCM(true); }} icon={I.plus}>New Client</Btn></div></div>
         <div style={{ position: "relative", marginBottom: 20 }}><input value={sq} onChange={e => setSq(e.target.value)} placeholder="Search..." style={{ width: "100%", padding: "12px 16px 12px 40px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 10, color: K.tx, fontSize: 14, fontFamily: ff, outline: "none", boxSizing: "border-box" }} /><div style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: K.td }}>{I.search}</div></div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>{fl.map(c => { const lp = getLatest(prgs, c.id); const pc = getAll(prgs, c.id).length; return <Crd key={c.id} onClick={() => setSelCl(c)} style={{ cursor: "pointer", borderLeft: "3px solid " + (lp ? K.ac : K.bd) }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}><div><div style={{ fontWeight: 600, color: K.tx, fontSize: 15, marginBottom: 6 }}>{c.name}</div><div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}><LvlBadge level={c.level} /><span style={{ fontSize: 12, color: K.tm }}>Mo.{c.monthNumber} · {c.sessionsPerWeek}×/wk · {c.sessionDuration}min</span>{c.trainingLocation === "home" && <Badge color={K.ac}>🏠 Home</Badge>}{(c.cardioDaysPerWeek || 0) > 0 && <Badge color="#2ecc71">+{c.cardioDaysPerWeek} Cardio</Badge>}</div><div style={{ fontSize: 12, color: K.td }}>{c.goals}</div></div><div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>{lp ? <Badge color={K.ac}>Mo.{lp.monthNumber} ✓</Badge> : <Badge color={K.wn}>Pending</Badge>}{pc > 1 && <span style={{ fontSize: 10, color: K.td }}>{pc} programs</span>}<div style={{ display: "flex", alignItems: "center", gap: 8 }}><button onClick={e => { e.stopPropagation(); setConfDel(c); }} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 4, borderRadius: 4, display: "flex", alignItems: "center" }} title="Delete">{I.trash}</button><div style={{ color: K.td }}>{I.chevron}</div></div></div></div></Crd>; })}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>{fl.map(c => { const lp = getLatest(prgs, c.id); const pc = getAll(prgs, c.id).length; return <Crd key={c.id} onClick={() => setSelCl(c)} style={{ cursor: "pointer", borderLeft: "3px solid " + (lp ? K.ac : K.bd) }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}><div><div style={{ fontWeight: 600, color: K.tx, fontSize: 15, marginBottom: 6 }}>{c.name}</div><div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}><LvlBadge level={c.level} /><span style={{ fontSize: 12, color: K.tm }}>Mo.{c.monthNumber} · {c.sessionsPerWeek}×/wk · {c.sessionDuration}min</span>{c.trainingLocation === "home" && <Badge color={K.ac}>🏠 Home</Badge>}{(c.cardioDaysPerWeek || 0) > 0 && <Badge color="#2ecc71">+{c.cardioDaysPerWeek} Running</Badge>}</div><div style={{ fontSize: 12, color: K.td }}>{c.goals}</div></div><div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>{lp ? <Badge color={K.ac}>Mo.{lp.monthNumber} ✓</Badge> : <Badge color={K.wn}>Pending</Badge>}{pc > 1 && <span style={{ fontSize: 10, color: K.td }}>{pc} programs</span>}<div style={{ display: "flex", alignItems: "center", gap: 8 }}><button onClick={e => { e.stopPropagation(); setConfDel(c); }} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 4, borderRadius: 4, display: "flex", alignItems: "center" }} title="Delete">{I.trash}</button><div style={{ color: K.td }}>{I.chevron}</div></div></div></div></Crd>; })}</div>
       </div>
     );
   }
