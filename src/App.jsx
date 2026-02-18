@@ -524,9 +524,39 @@ function generateProgram(client, previousProgram = null) {
   const prevExMap = extractPrevExercises(previousProgram);
   const phaseLabel = { foundation: "Foundation", hypertrophy: "Hypertrophy", strength: "Strength", deload: "Deload" }[phase];
 
-  // Generate Block 1 (W1-2)
-  const usedB1 = new Set();
-  const block1 = schedule.map((dt, i) => ({ dayLabel: "Day " + (i+1), focus: dayLabels[dt], dayType: dt, exercises: generateDay(dt, phaseCfg, durationCfg, 0, usedB1, loc, prevExMap, phase) }));
+  let block1;
+
+  if (previousProgram && previousProgram.block2 && previousProgram.block2.length > 0) {
+    // ── EXISTING CLIENT: clone previous program's structure, only update sets/reps/weight/RPE ──
+    // Use block2 as the "most recent state" of each exercise
+    block1 = previousProgram.block2.map(day => ({
+      ...day,
+      exercises: day.exercises.map(ex => {
+        if (ex.section === "Warm-Up") return { ...ex };
+        if (ex.section === "Core") return { ...ex, sets: phaseCfg.coreSets, reps: ex.reps };
+        if (ex.section === "Finisher") {
+          const rpe = phase === "deload" ? "6" : "8-9";
+          return { ...ex, rpe };
+        }
+        // Strength: progress weight, update sets/reps/RPE based on new phase
+        const isComp = (ex.category === "compound" || ex.rest >= 120);
+        const sets = isComp ? phaseCfg.cSets : phaseCfg.aSets;
+        const reps = isComp ? phaseCfg.cReps : phaseCfg.aReps;
+        const rpe = isComp ? phaseCfg.cRPE : phaseCfg.aRPE;
+        const rest = isComp ? phaseCfg.rest : phaseCfg.aRest;
+        const inc = isComp ? phaseCfg.wInc : phaseCfg.wIncAcc;
+        const newWeight = progressWeight(ex.weight, inc, isComp);
+        const tempoNote = phaseCfg.tempo && !(ex.notes || "").includes("ecc") ? phaseCfg.tempo : "";
+        const prevNotes = (ex.notes || "").replace(/push harder vs W1-2/g, "").replace(/ecc \d+s/g, "").replace(/\s*\|\s*$/g, "").trim();
+        const notes = [prevNotes, tempoNote].filter(Boolean).join(" | ");
+        return { ...ex, sets, reps, rest, weight: newWeight, rpe, notes: notes.trim() };
+      })
+    }));
+  } else {
+    // ── NEW CLIENT: generate fresh program ──
+    const usedB1 = new Set();
+    block1 = schedule.map((dt, i) => ({ dayLabel: "Day " + (i+1), focus: dayLabels[dt], dayType: dt, exercises: generateDay(dt, phaseCfg, durationCfg, 0, usedB1, loc, prevExMap, phase) }));
+  }
 
   // Generate Block 2 (W3-4) — micro-progression from Block 1
   const block2 = block1.map(day => ({
@@ -535,16 +565,15 @@ function generateProgram(client, previousProgram = null) {
   }));
 
   const cardioDays = client.cardioDaysPerWeek || 0;
+  // Carry over running/cardio from previous if exists
+  const prevCardio = previousProgram && previousProgram.cardio ? previousProgram.cardio : null;
   return {
     id: "prog_" + Date.now(), clientId: client.id, clientName: client.name, level: client.level,
     monthNumber, sessionsPerWeek: client.sessionsPerWeek || 3, sessionDuration: client.sessionDuration || 60, trainingLocation: loc, createdAt: new Date().toISOString(),
     block1, block2, levelCfg: phaseCfg, durationCfg, phase: phaseLabel,
     includesRunning: client.includesRunning || cardioDays > 0, cardioDaysPerWeek: cardioDays,
-    cardio: cardioDays > 0 ? { block1: generateCardioDays(client.level, cardioDays, 0), block2: generateCardioDays(client.level, cardioDays, 1) } : null,
-    running: client.includesRunning && cardioDays === 0 ? {
-      block1: [{ day: "Off-Day 1", type: "Easy Run", duration: client.level === "beginner" ? "20 min" : "25 min", notes: "Conversational pace" }, { day: "Off-Day 2", type: client.level === "beginner" ? "Easy Run" : "Tempo Run", duration: client.level === "beginner" ? "20 min" : "30 min", notes: client.level === "beginner" ? "Walk/run intervals OK" : "Moderate effort" }],
-      block2: [{ day: "Off-Day 1", type: "Easy Run", duration: "30 min", notes: "Conversational pace" }, { day: "Off-Day 2", type: client.level === "advanced" ? "Interval Run" : "Tempo Run", duration: "30 min", notes: client.level === "advanced" ? "6×400m w/ 90s rest" : "Progressive pace" }],
-    } : null,
+    cardio: prevCardio || (cardioDays > 0 ? { block1: generateCardioDays(client.level, cardioDays, 0), block2: generateCardioDays(client.level, cardioDays, 1) } : null),
+    running: null,
   };
 }
 
