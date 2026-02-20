@@ -1917,7 +1917,7 @@ export default function App() {
       return (
         <div style={{ background: K.cd, border: "1px solid " + K.bd, borderRadius: ssRadius, marginBottom: ssMargin, padding: "8px 12px", ...ssStyle }}>
           {isSSStart && <div style={{ fontSize: 9, fontWeight: 700, color: "#f0a030", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Superset</div>}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto 28px 28px", gap: 6, alignItems: "center" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(100px,280px) 1fr 1fr 28px 28px", gap: 6, alignItems: "center" }}>
             <div style={{ color: K.tx, fontWeight: 500, fontSize: 13, cursor: "pointer", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} onClick={() => setExPk({ di, sec: ex.section, idx: ei, rep: true })}>
               {ex.name}{ex.circuit && <span style={{ fontSize: 10, color: K.td, marginLeft: 4 }}>({ex.circuit.join(", ")})</span>}
             </div>
@@ -1983,10 +1983,10 @@ export default function App() {
 
                   {!isCollapsed && <div style={{ border: "1px solid " + K.bd, borderTop: "none", borderRadius: "0 0 10px 10px", padding: isMobile ? 8 : 12 }}>
                     {/* Column headers - wide desktop only */}
-                    {!isCompact && <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto 28px 28px", gap: 6, padding: "0 12px 6px", borderBottom: "1px solid " + K.bd, marginBottom: 8 }}>
+                    {!isCompact && <div style={{ display: "grid", gridTemplateColumns: "minmax(100px,280px) 1fr 1fr 28px 28px", gap: 6, padding: "0 12px 6px", borderBottom: "1px solid " + K.bd, marginBottom: 8 }}>
                       <span style={{ fontSize: 10, color: K.td, fontWeight: 600 }}>EXERCISE</span>
-                      <span style={{ fontSize: 10, color: K.td, fontWeight: 600, width: 185, textAlign: "center" }}>BLOCK 1 (W1-2)</span>
-                      <span style={{ fontSize: 10, color: K.td, fontWeight: 600, width: 185, textAlign: "center" }}>BLOCK 2 (W3-4)</span>
+                      <span style={{ fontSize: 10, color: K.td, fontWeight: 600, textAlign: "center" }}>BLOCK 1 (W1-2)</span>
+                      <span style={{ fontSize: 10, color: K.td, fontWeight: 600, textAlign: "center" }}>BLOCK 2 (W3-4)</span>
                       <span></span><span></span>
                     </div>}
 
