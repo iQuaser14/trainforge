@@ -1547,7 +1547,6 @@ export default function App() {
   const [confDel, setConfDel] = useState(null);
   const [confDelPr, setConfDelPr] = useState(null);
   const [showImport, setShowImport] = useState(false);
-  const [sq, setSq] = useState("");
   const [ntf, setNtf] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mobNav, setMobNav] = useState(false);
@@ -2050,7 +2049,7 @@ export default function App() {
           </div>
         </div>
 
-        {exPk && ExPick({ section: exPk.sec, dayType: (p.block1[exPk.di] || {}).dayType, location: p.trainingLocation || "gym", onSelect: ex => { if (exPk.rep && exPk.idx != null) { repEx(exPk.di, exPk.idx, ex); } else { const np = { ...p }; np.block1 = [...np.block1]; np.block1[exPk.di] = { ...np.block1[exPk.di] }; const exs = [...np.block1[exPk.di].exercises]; const ic = ex.category === "compound"; const lc = p.levelCfg || {}; const ne = { ...ex, section: exPk.sec, sets: ic ? (lc.compoundSets || lc.cSets || 4) : (lc.accessorySets || lc.aSets || 3), reps: ic ? (lc.compoundReps || lc.cReps || "8") : (lc.accessoryReps || lc.aReps || "10"), rest: ic ? (lc.restCompound || lc.rest || 120) : (lc.restAccessory || lc.aRest || 90), weight: "—", rpe: ic ? (lc.compoundRPE || lc.cRPE || "") : (lc.accessoryRPE || lc.aRPE || ""), notes: "" }; let ia = exs.length; for (let i = exs.length - 1; i >= 0; i--) { if (exs[i].section === exPk.sec) { ia = i + 1; break; } } exs.splice(ia, 0, ne); np.block1[exPk.di].exercises = exs; syncBlock2(np); setP(np); setExPk(null); } }, onClose: () => setExPk(null) })}
+        {exPk && <ExPick section={exPk.sec} dayType={(p.block1[exPk.di] || {}).dayType} location={p.trainingLocation || "gym"} onSelect={ex => { if (exPk.rep && exPk.idx != null) { repEx(exPk.di, exPk.idx, ex); } else { const np = { ...p }; np.block1 = [...np.block1]; np.block1[exPk.di] = { ...np.block1[exPk.di] }; const exs = [...np.block1[exPk.di].exercises]; const ic = ex.category === "compound"; const lc = p.levelCfg || {}; const ne = { ...ex, section: exPk.sec, sets: ic ? (lc.compoundSets || lc.cSets || 4) : (lc.accessorySets || lc.aSets || 3), reps: ic ? (lc.compoundReps || lc.cReps || "8") : (lc.accessoryReps || lc.aReps || "10"), rest: ic ? (lc.restCompound || lc.rest || 120) : (lc.restAccessory || lc.aRest || 90), weight: "—", rpe: ic ? (lc.compoundRPE || lc.cRPE || "") : (lc.accessoryRPE || lc.aRPE || ""), notes: "" }; let ia = exs.length; for (let i = exs.length - 1; i >= 0; i--) { if (exs[i].section === exPk.sec) { ia = i + 1; break; } } exs.splice(ia, 0, ne); np.block1[exPk.di].exercises = exs; syncBlock2(np); setP(np); setExPk(null); } }} onClose={() => setExPk(null)} />}
       </div>
     );
   }
@@ -2114,6 +2113,7 @@ export default function App() {
 
   function Clients() {
     const [histCl, setHistCl] = useState(null);
+    const [sq, setSq] = useState("");
     const fl = cls.filter(c => c.name.toLowerCase().includes(sq.toLowerCase()) || c.level.includes(sq.toLowerCase()));
     if (selCl && selPr) { const allPr = getAll(prgs, selCl.id); const prIdx = allPr.findIndex(x => x.id === selPr.id); const prevPr = prIdx > 0 ? allPr[prIdx - 1] : null; return <ProgEdit program={selPr} prevProgram={prevPr} onSave={u => { setPrgs(updProg(prgs, u.clientId, u)); setSelPr(u); dbSave("programs", prToDb(u)).catch(console.error); }} onBack={() => setSelPr(null)} />; }
     if (selCl && histCl) return <ProgHistory client={selCl} programs={getAll(prgs, selCl.id)} onSelectProgram={p => { setSelPr(p); setHistCl(null); }} onBack={() => setHistCl(null)} />;
@@ -2192,13 +2192,13 @@ export default function App() {
         </div>
       </div>}
 
-      <main style={{ flex: 1, padding: isMobile ? "16px 12px 90px" : isTablet ? "20px 20px" : "28px 36px", overflowY: "auto", maxHeight: isMobile ? undefined : uiScale > 1 ? (100 / uiScale) + "vh" : "100vh" }}>{pg === "dashboard" && Dash()}{pg === "clients" && Clients()}{pg === "programs" && Programs()}{pg === "library" && Library()}</main>
+      <main style={{ flex: 1, padding: isMobile ? "16px 12px 90px" : isTablet ? "20px 20px" : "28px 36px", overflowY: "auto", maxHeight: isMobile ? undefined : uiScale > 1 ? (100 / uiScale) + "vh" : "100vh" }}>{pg === "dashboard" && <Dash />}{pg === "clients" && <Clients />}{pg === "programs" && <Programs />}{pg === "library" && <Library />}</main>
 
       {/* Mobile bottom tab bar */}
       {isMobile && <nav className="tf-bottom-nav" style={{ position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: K.sf, borderTop: "1px solid " + K.bd, zIndex: 50, paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
         {nav.map(n => <button key={n.id} onClick={() => { setPg(n.id); setSelCl(null); setSelPr(null); }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "10px 4px", border: "none", background: pg === n.id ? K.ab : "transparent", color: pg === n.id ? K.ac : K.tm, fontFamily: ff, fontSize: 10, fontWeight: 600, cursor: "pointer", borderTop: pg === n.id ? "2px solid " + K.ac : "2px solid transparent" }}>{n.icon}<span>{n.label}</span></button>)}
       </nav>}
-      {showCM && ClForm({ client: editCl, onClose: () => { setShowCM(false); setEditCl(null); }, onSave: c => { if (editCl) { setCls(cls.map(x => x.id === c.id ? c : x)); if (selCl?.id === c.id) setSelCl(c); } else setCls([...cls, c]); dbSave("clients", clToDb(c)).catch(console.error); setShowCM(false); setEditCl(null); notify(editCl ? "Updated!" : "Added!"); } })}
+      {showCM && <ClForm client={editCl} onClose={() => { setShowCM(false); setEditCl(null); }} onSave={c => { if (editCl) { setCls(cls.map(x => x.id === c.id ? c : x)); if (selCl?.id === c.id) setSelCl(c); } else setCls([...cls, c]); dbSave("clients", clToDb(c)).catch(console.error); setShowCM(false); setEditCl(null); notify(editCl ? "Updated!" : "Added!"); }} />}
       {confDel && <Mdl title="Delete Client" onClose={() => setConfDel(null)}><p style={{ color: K.tm, fontSize: 14, marginBottom: 8 }}>Are you sure you want to delete <strong style={{ color: K.tx }}>{confDel.name}</strong>?</p><p style={{ color: K.dg, fontSize: 13, marginBottom: 20 }}>This will also delete all {(getAll(prgs, confDel.id) || []).length} associated programs. This action cannot be undone.</p><div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}><Btn v="secondary" onClick={() => setConfDel(null)}>Cancel</Btn><Btn v="danger" onClick={() => { const cId = confDel.id; dbDelete("clients", cId).catch(console.error); (getAll(prgs, cId) || []).forEach(p => dbDelete("programs", p.id).catch(console.error)); setCls(cls.filter(c => c.id !== cId)); const np = { ...prgs }; delete np[cId]; setPrgs(np); if (selCl?.id === cId) { setSelCl(null); setSelPr(null); } setConfDel(null); notify("Client deleted", "warn"); }}>Delete</Btn></div></Mdl>}
       {confDelPr && <Mdl title="Delete Program" onClose={() => setConfDelPr(null)}><p style={{ color: K.tm, fontSize: 14, marginBottom: 8 }}>Delete <strong style={{ color: K.tx }}>{confDelPr.clientName} — Month {confDelPr.monthNumber}</strong>?</p><p style={{ color: K.dg, fontSize: 13, marginBottom: 20 }}>This action cannot be undone.</p><div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}><Btn v="secondary" onClick={() => setConfDelPr(null)}>Cancel</Btn><Btn v="danger" onClick={() => { const p = confDelPr; dbDelete("programs", p.id).catch(console.error); const np = { ...prgs, [p.clientId]: (prgs[p.clientId] || []).filter(x => x.id !== p.id) }; if (np[p.clientId].length === 0) delete np[p.clientId]; setPrgs(np); if (selPr?.id === p.id) setSelPr(null); setConfDelPr(null); notify("Program deleted", "warn"); }}>Delete</Btn></div></Mdl>}
       {showImport && <ImportModal cls={cls} setCls={setCls} prgs={prgs} setPrgs={setPrgs} onClose={() => setShowImport(false)} notify={notify} dbSave={dbSave} clToDb={clToDb} prToDb={prToDb} />}
