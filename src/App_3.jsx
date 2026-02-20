@@ -1550,7 +1550,20 @@ export default function App() {
   const [sq, setSq] = useState("");
   const [ntf, setNtf] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [zoom, setZoom] = useState(1);
   const notify = (m, t = "success") => { setNtf({ m, t }); setTimeout(() => setNtf(null), 3000); };
+
+  // Responsive zoom: scale to fit any viewport
+  const DESIGN_W = 1280;
+  useEffect(() => {
+    const calc = () => {
+      const w = window.innerWidth;
+      setZoom(w < DESIGN_W ? w / DESIGN_W : 1);
+    };
+    calc();
+    window.addEventListener("resize", calc);
+    return () => window.removeEventListener("resize", calc);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -2131,7 +2144,7 @@ export default function App() {
     </div>
   );
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: K.bg, fontFamily: ff, color: K.tx }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: K.bg, fontFamily: ff, color: K.tx, zoom: zoom, WebkitTextSizeAdjust: "100%" }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
       <nav style={{ width: 220, minHeight: "100vh", background: K.sf, borderRight: "1px solid " + K.bd, padding: "20px 0", display: "flex", flexDirection: "column", flexShrink: 0 }}>
         <div style={{ padding: "0 20px 24px", borderBottom: "1px solid " + K.bd, marginBottom: 16 }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ width: 32, height: 32, borderRadius: 8, background: K.ac, display: "flex", alignItems: "center", justifyContent: "center", color: "#0a0a0c" }}>{I.bolt}</div><div><div style={{ fontWeight: 700, fontSize: 15, color: K.tx, letterSpacing: "-0.02em" }}>TrainForge</div><div style={{ fontSize: 10, color: K.td, textTransform: "uppercase", letterSpacing: "0.08em" }}>Pro Dashboard</div></div></div></div>

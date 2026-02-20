@@ -1553,16 +1553,20 @@ export default function App() {
   const [mobNav, setMobNav] = useState(false);
   const notify = (m, t = "success") => { setNtf({ m, t }); setTimeout(() => setNtf(null), 3000); };
 
-  // Responsive: detect screen size tiers
+  // Responsive: detect screen size tiers + dynamic scaling
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
+  const [uiScale, setUiScale] = useState(1);
   useEffect(() => {
     const check = () => {
       const w = window.innerWidth;
       setIsMobile(w < 768);
       setIsTablet(w >= 768 && w < 1024);
       setIsCompact(w < 1024);
+      // Dynamic scaling: 1440px→1.0x, 1920px→2.5x, capped 3.0x
+      const scale = w >= 1440 ? Math.min(3.0, 1 + (w - 1440) * 0.003125) : 1;
+      setUiScale(scale);
     };
     check();
     window.addEventListener("resize", check);
@@ -1871,11 +1875,11 @@ export default function App() {
 
     // Inline fields component for one block
     const ExFields = ({ bk, di, ei, ex }) => (
-      <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
         {["sets","reps","weight","rpe"].map(fld => (
           <input key={fld} value={ex[fld] || ""} onChange={e => upEx(bk, di, ei, fld, e.target.value)}
-            placeholder={fld} title={fld}
-            style={{ width: fld === "weight" ? 56 : fld === "reps" ? 50 : 38, padding: "6px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 12, fontFamily: mf, textAlign: "center", outline: "none", minHeight: 32 }} />
+            placeholder={fld.charAt(0).toUpperCase() + fld.slice(1)} title={fld}
+            style={{ width: fld === "weight" ? 52 : fld === "reps" ? 44 : 32, padding: "6px 3px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none", minHeight: 30 }} />
         ))}
       </div>
     );
@@ -1902,8 +1906,8 @@ export default function App() {
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <div><span style={{ fontSize: 8, color: K.td }}>W1-2</span>{ex1 && <ExFields bk="block1" di={di} ei={ei} ex={ex1} />}</div>
-              <div><span style={{ fontSize: 8, color: K.td }}>W3-4</span>{ex2 && <ExFields bk="block2" di={di} ei={ei} ex={ex2} />}</div>
+              <div><span style={{ fontSize: 8, color: K.td }}>W1-2</span>{ex1 && ExFields({ bk: "block1", di, ei, ex: ex1 })}</div>
+              <div><span style={{ fontSize: 8, color: K.td }}>W3-4</span>{ex2 && ExFields({ bk: "block2", di, ei, ex: ex2 })}</div>
             </div>
             <div style={{ display: "flex", gap: 6, marginTop: 6, alignItems: "center", flexWrap: "wrap" }}>
               <input value={ex1?.notes || ""} onChange={e => upEx("block1", di, ei, "notes", e.target.value)} placeholder="Notes..." style={{ padding: "3px 8px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 80 }} />
@@ -1913,22 +1917,24 @@ export default function App() {
         );
       }
 
-      // DESKTOP: original single-row grid — name | W1-2 | W3-4 | SS | trash
+      // DESKTOP: single-row grid — name | W1-2 fields + notes | W3-4 fields + notes | SS | trash
       return (
         <div style={{ background: K.cd, border: "1px solid " + K.bd, borderRadius: ssRadius, marginBottom: ssMargin, padding: "8px 12px", ...ssStyle }}>
           {isSSStart && <div style={{ fontSize: 9, fontWeight: 700, color: "#f0a030", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Superset</div>}
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(100px,280px) 1fr 1fr 28px 28px", gap: 6, alignItems: "center" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(120px, 1.2fr) minmax(200px, 1fr) minmax(200px, 1fr) 28px 28px", gap: 8, alignItems: "center" }}>
             <div style={{ color: K.tx, fontWeight: 500, fontSize: 13, cursor: "pointer", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} onClick={() => setExPk({ di, sec: ex.section, idx: ei, rep: true })}>
               {ex.name}{ex.circuit && <span style={{ fontSize: 10, color: K.td, marginLeft: 4 }}>({ex.circuit.join(", ")})</span>}
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 8, color: K.td, textAlign: "center" }}>W1-2</span>{ex1 && <ExFields bk="block1" di={di} ei={ei} ex={ex1} />}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 8, color: K.td, textAlign: "center" }}>W3-4</span>{ex2 && <ExFields bk="block2" di={di} ei={ei} ex={ex2} />}</div>
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>{ex1 && ExFields({ bk: "block1", di, ei, ex: ex1 })}<input value={ex1?.notes || ""} onChange={e => upEx("block1", di, ei, "notes", e.target.value)} placeholder="Notes" style={{ padding: "6px 6px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 40, minHeight: 30 }} /></div>
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>{ex2 && ExFields({ bk: "block2", di, ei, ex: ex2 })}<input value={ex2?.notes || ""} onChange={e => upEx("block2", di, ei, "notes", e.target.value)} placeholder="Notes" style={{ padding: "6px 6px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 40, minHeight: 30 }} /></div>
             <button onClick={() => toggleSS(di, ei)} title="Toggle Superset" style={{ background: "none", border: "none", color: ex.ssGroup ? "#f0a030" : K.td, cursor: "pointer", padding: 2, opacity: 0.7, fontSize: 14 }}>SS</button>
             <button onClick={() => rmEx(di, ei)} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 2, opacity: 0.5 }}>{I.trash}</button>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 6, marginTop: 4, alignItems: "center" }}>
-            <input value={ex1?.notes || ""} onChange={e => upEx("block1", di, ei, "notes", e.target.value)} placeholder="Notes..." style={{ padding: "3px 8px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1 }} />
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(120px, 1.2fr) minmax(200px, 1fr) minmax(200px, 1fr) 28px 28px", gap: 8, marginTop: 4, alignItems: "center" }}>
+            <div></div>
             <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={ex1?.rest || ""} onChange={e => upEx("block1", di, ei, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={ex2?.rest || ""} onChange={e => upEx("block2", di, ei, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>
+            <div></div><div></div>
           </div>
         </div>
       );
@@ -1983,10 +1989,10 @@ export default function App() {
 
                   {!isCollapsed && <div style={{ border: "1px solid " + K.bd, borderTop: "none", borderRadius: "0 0 10px 10px", padding: isMobile ? 8 : 12 }}>
                     {/* Column headers - wide desktop only */}
-                    {!isCompact && <div style={{ display: "grid", gridTemplateColumns: "minmax(100px,280px) 1fr 1fr 28px 28px", gap: 6, padding: "0 12px 6px", borderBottom: "1px solid " + K.bd, marginBottom: 8 }}>
+                    {!isCompact && <div style={{ display: "grid", gridTemplateColumns: "minmax(120px, 1.2fr) minmax(200px, 1fr) minmax(200px, 1fr) 28px 28px", gap: 8, padding: "0 12px 6px", borderBottom: "1px solid " + K.bd, marginBottom: 8 }}>
                       <span style={{ fontSize: 10, color: K.td, fontWeight: 600 }}>EXERCISE</span>
-                      <span style={{ fontSize: 10, color: K.td, fontWeight: 600, textAlign: "center" }}>BLOCK 1 (W1-2)</span>
-                      <span style={{ fontSize: 10, color: K.td, fontWeight: 600, textAlign: "center" }}>BLOCK 2 (W3-4)</span>
+                      <span style={{ fontSize: 10, color: K.td, fontWeight: 600 }}>BLOCK 1 (W1-2)</span>
+                      <span style={{ fontSize: 10, color: K.td, fontWeight: 600 }}>BLOCK 2 (W3-4)</span>
                       <span></span><span></span>
                     </div>}
 
@@ -2004,7 +2010,7 @@ export default function App() {
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 3, height: 14, borderRadius: 2, background: sc(ex1.section) }} /><span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: sc(ex1.section) }}>{ex1.section}</span></div>
                           <Btn v="ghost" sm onClick={() => setExPk({ di, sec: ex1.section })} icon={I.plus}>Add</Btn>
                         </div>}
-                        <ExRow di={di} ei={ei} ex1={ex1} ex2={ex2} isSSStart={isSSStart} isSSMid={isSSMid} isSSEnd={isSSEnd} />
+                        {ExRow({ di, ei, ex1, ex2, isSSStart, isSSMid, isSSEnd })}
                       </div>);
                     }); })()}
                   </div>}
@@ -2044,7 +2050,7 @@ export default function App() {
           </div>
         </div>
 
-        {exPk && <ExPick section={exPk.sec} dayType={(p.block1[exPk.di] || {}).dayType} location={p.trainingLocation || "gym"} onSelect={ex => { if (exPk.rep && exPk.idx != null) { repEx(exPk.di, exPk.idx, ex); } else { const np = { ...p }; np.block1 = [...np.block1]; np.block1[exPk.di] = { ...np.block1[exPk.di] }; const exs = [...np.block1[exPk.di].exercises]; const ic = ex.category === "compound"; const lc = p.levelCfg || {}; const ne = { ...ex, section: exPk.sec, sets: ic ? (lc.compoundSets || lc.cSets || 4) : (lc.accessorySets || lc.aSets || 3), reps: ic ? (lc.compoundReps || lc.cReps || "8") : (lc.accessoryReps || lc.aReps || "10"), rest: ic ? (lc.restCompound || lc.rest || 120) : (lc.restAccessory || lc.aRest || 90), weight: "—", rpe: ic ? (lc.compoundRPE || lc.cRPE || "") : (lc.accessoryRPE || lc.aRPE || ""), notes: "" }; let ia = exs.length; for (let i = exs.length - 1; i >= 0; i--) { if (exs[i].section === exPk.sec) { ia = i + 1; break; } } exs.splice(ia, 0, ne); np.block1[exPk.di].exercises = exs; syncBlock2(np); setP(np); setExPk(null); } }} onClose={() => setExPk(null)} />}
+        {exPk && ExPick({ section: exPk.sec, dayType: (p.block1[exPk.di] || {}).dayType, location: p.trainingLocation || "gym", onSelect: ex => { if (exPk.rep && exPk.idx != null) { repEx(exPk.di, exPk.idx, ex); } else { const np = { ...p }; np.block1 = [...np.block1]; np.block1[exPk.di] = { ...np.block1[exPk.di] }; const exs = [...np.block1[exPk.di].exercises]; const ic = ex.category === "compound"; const lc = p.levelCfg || {}; const ne = { ...ex, section: exPk.sec, sets: ic ? (lc.compoundSets || lc.cSets || 4) : (lc.accessorySets || lc.aSets || 3), reps: ic ? (lc.compoundReps || lc.cReps || "8") : (lc.accessoryReps || lc.aReps || "10"), rest: ic ? (lc.restCompound || lc.rest || 120) : (lc.restAccessory || lc.aRest || 90), weight: "—", rpe: ic ? (lc.compoundRPE || lc.cRPE || "") : (lc.accessoryRPE || lc.aRPE || ""), notes: "" }; let ia = exs.length; for (let i = exs.length - 1; i >= 0; i--) { if (exs[i].section === exPk.sec) { ia = i + 1; break; } } exs.splice(ia, 0, ne); np.block1[exPk.di].exercises = exs; syncBlock2(np); setP(np); setExPk(null); } }, onClose: () => setExPk(null) })}
       </div>
     );
   }
@@ -2168,12 +2174,12 @@ export default function App() {
     </div>
   );
   return (
-    <div className="tf-root" style={{ display: "flex", flexDirection: isMobile ? "column" : "row", minHeight: "100vh", background: K.bg, fontFamily: ff, color: K.tx, WebkitTextSizeAdjust: "100%" }}>
+    <div className="tf-root" style={{ display: "flex", flexDirection: isMobile ? "column" : "row", minHeight: uiScale > 1 ? (100 / uiScale) + "vh" : "100vh", background: K.bg, fontFamily: ff, color: K.tx, WebkitTextSizeAdjust: "100%", zoom: uiScale > 1 ? uiScale : undefined }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
       <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 
       {/* Desktop sidebar */}
-      {!isMobile && <nav style={{ width: 220, minHeight: "100vh", background: K.sf, borderRight: "1px solid " + K.bd, padding: "20px 0", display: "flex", flexDirection: "column", flexShrink: 0 }}>
+      {!isMobile && <nav style={{ width: 220, minHeight: uiScale > 1 ? (100 / uiScale) + "vh" : "100vh", background: K.sf, borderRight: "1px solid " + K.bd, padding: "20px 0", display: "flex", flexDirection: "column", flexShrink: 0 }}>
         <div style={{ padding: "0 20px 24px", borderBottom: "1px solid " + K.bd, marginBottom: 16 }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ width: 32, height: 32, borderRadius: 8, background: K.ac, display: "flex", alignItems: "center", justifyContent: "center", color: "#0a0a0c" }}>{I.bolt}</div><div><div style={{ fontWeight: 700, fontSize: 15, color: K.tx, letterSpacing: "-0.02em" }}>TrainForge</div><div style={{ fontSize: 10, color: K.td, textTransform: "uppercase", letterSpacing: "0.08em" }}>Pro Dashboard</div></div></div></div>
         {nav.map(n => <button key={n.id} onClick={() => { setPg(n.id); setSelCl(null); setSelPr(null); }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 20px", border: "none", background: pg === n.id ? K.ab : "transparent", color: pg === n.id ? K.ac : K.tm, fontFamily: ff, fontSize: 13, fontWeight: 600, cursor: "pointer", borderLeft: pg === n.id ? "2px solid " + K.ac : "2px solid transparent", width: "100%", textAlign: "left" }}>{n.icon}{n.label}</button>)}
       </nav>}
@@ -2186,13 +2192,13 @@ export default function App() {
         </div>
       </div>}
 
-      <main style={{ flex: 1, padding: isMobile ? "16px 12px 90px" : isTablet ? "20px 20px" : "28px 36px", overflowY: "auto", maxHeight: isMobile ? undefined : "100vh" }}>{pg === "dashboard" && <Dash />}{pg === "clients" && <Clients />}{pg === "programs" && <Programs />}{pg === "library" && <Library />}</main>
+      <main style={{ flex: 1, padding: isMobile ? "16px 12px 90px" : isTablet ? "20px 20px" : "28px 36px", overflowY: "auto", maxHeight: isMobile ? undefined : uiScale > 1 ? (100 / uiScale) + "vh" : "100vh" }}>{pg === "dashboard" && Dash()}{pg === "clients" && Clients()}{pg === "programs" && Programs()}{pg === "library" && Library()}</main>
 
       {/* Mobile bottom tab bar */}
       {isMobile && <nav className="tf-bottom-nav" style={{ position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: K.sf, borderTop: "1px solid " + K.bd, zIndex: 50, paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
         {nav.map(n => <button key={n.id} onClick={() => { setPg(n.id); setSelCl(null); setSelPr(null); }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "10px 4px", border: "none", background: pg === n.id ? K.ab : "transparent", color: pg === n.id ? K.ac : K.tm, fontFamily: ff, fontSize: 10, fontWeight: 600, cursor: "pointer", borderTop: pg === n.id ? "2px solid " + K.ac : "2px solid transparent" }}>{n.icon}<span>{n.label}</span></button>)}
       </nav>}
-      {showCM && <ClForm client={editCl} onClose={() => { setShowCM(false); setEditCl(null); }} onSave={c => { if (editCl) { setCls(cls.map(x => x.id === c.id ? c : x)); if (selCl?.id === c.id) setSelCl(c); } else setCls([...cls, c]); dbSave("clients", clToDb(c)).catch(console.error); setShowCM(false); setEditCl(null); notify(editCl ? "Updated!" : "Added!"); }} />}
+      {showCM && ClForm({ client: editCl, onClose: () => { setShowCM(false); setEditCl(null); }, onSave: c => { if (editCl) { setCls(cls.map(x => x.id === c.id ? c : x)); if (selCl?.id === c.id) setSelCl(c); } else setCls([...cls, c]); dbSave("clients", clToDb(c)).catch(console.error); setShowCM(false); setEditCl(null); notify(editCl ? "Updated!" : "Added!"); } })}
       {confDel && <Mdl title="Delete Client" onClose={() => setConfDel(null)}><p style={{ color: K.tm, fontSize: 14, marginBottom: 8 }}>Are you sure you want to delete <strong style={{ color: K.tx }}>{confDel.name}</strong>?</p><p style={{ color: K.dg, fontSize: 13, marginBottom: 20 }}>This will also delete all {(getAll(prgs, confDel.id) || []).length} associated programs. This action cannot be undone.</p><div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}><Btn v="secondary" onClick={() => setConfDel(null)}>Cancel</Btn><Btn v="danger" onClick={() => { const cId = confDel.id; dbDelete("clients", cId).catch(console.error); (getAll(prgs, cId) || []).forEach(p => dbDelete("programs", p.id).catch(console.error)); setCls(cls.filter(c => c.id !== cId)); const np = { ...prgs }; delete np[cId]; setPrgs(np); if (selCl?.id === cId) { setSelCl(null); setSelPr(null); } setConfDel(null); notify("Client deleted", "warn"); }}>Delete</Btn></div></Mdl>}
       {confDelPr && <Mdl title="Delete Program" onClose={() => setConfDelPr(null)}><p style={{ color: K.tm, fontSize: 14, marginBottom: 8 }}>Delete <strong style={{ color: K.tx }}>{confDelPr.clientName} — Month {confDelPr.monthNumber}</strong>?</p><p style={{ color: K.dg, fontSize: 13, marginBottom: 20 }}>This action cannot be undone.</p><div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}><Btn v="secondary" onClick={() => setConfDelPr(null)}>Cancel</Btn><Btn v="danger" onClick={() => { const p = confDelPr; dbDelete("programs", p.id).catch(console.error); const np = { ...prgs, [p.clientId]: (prgs[p.clientId] || []).filter(x => x.id !== p.id) }; if (np[p.clientId].length === 0) delete np[p.clientId]; setPrgs(np); if (selPr?.id === p.id) setSelPr(null); setConfDelPr(null); notify("Program deleted", "warn"); }}>Delete</Btn></div></Mdl>}
       {showImport && <ImportModal cls={cls} setCls={setCls} prgs={prgs} setPrgs={setPrgs} onClose={() => setShowImport(false)} notify={notify} dbSave={dbSave} clToDb={clToDb} prToDb={prToDb} />}
@@ -2201,6 +2207,7 @@ export default function App() {
         @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
         *{box-sizing:border-box}
         ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:${K.bg}}::-webkit-scrollbar-thumb{background:${K.bd};border-radius:3px}
+        ::-webkit-scrollbar-thumb:hover{background:${K.tm}}
         select option{background:${K.sf};color:${K.tx}}
         input:focus,select:focus,textarea:focus{border-color:${K.ac}!important}
         

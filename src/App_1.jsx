@@ -623,17 +623,17 @@ const mf = "'JetBrains Mono','SF Mono',monospace";
 function Badge({ children, color = K.ac, bg }) { return <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color, background: bg || (color + "18") }}>{children}</span>; }
 function LvlBadge({ level }) { return <Badge color={{ beginner: K.beg, intermediate: K.int, advanced: K.adv }[level] || K.tm}>{level}</Badge>; }
 function Btn({ children, onClick, v = "primary", sm, icon, style: cs, disabled }) {
-  const base = { display: "inline-flex", alignItems: "center", gap: 6, border: "none", borderRadius: 8, fontFamily: ff, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer", transition: "all 0.15s", opacity: disabled ? 0.5 : 1 };
+  const base = { display: "inline-flex", alignItems: "center", gap: 6, border: "none", borderRadius: 8, fontFamily: ff, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer", transition: "all 0.15s", opacity: disabled ? 0.5 : 1, minHeight: sm ? 36 : 44 };
   const vs = { primary: { background: K.ac, color: "#0a0a0c" }, secondary: { background: K.sfh, color: K.tx, border: "1px solid " + K.bd }, ghost: { background: "transparent", color: K.tm }, danger: { background: K.dgb, color: K.dg } };
   return <button onClick={onClick} disabled={disabled} style={{ ...base, ...vs[v], padding: sm ? "6px 12px" : "10px 20px", fontSize: sm ? 12 : 13, ...cs }}>{icon}{children}</button>;
 }
 function Inp({ label, value, onChange, type = "text", placeholder, textarea, options, style: cs }) {
-  const s = { width: "100%", padding: "10px 14px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 8, color: K.tx, fontSize: 13, fontFamily: ff, outline: "none", boxSizing: "border-box", ...cs };
+  const s = { width: "100%", padding: "10px 14px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 8, color: K.tx, fontSize: 14, fontFamily: ff, outline: "none", boxSizing: "border-box", minHeight: 44, ...cs };
   return (<div style={{ marginBottom: 14 }}>{label && <label style={{ display: "block", marginBottom: 6, fontSize: 12, fontWeight: 600, color: K.tm, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</label>}{options ? <select value={value} onChange={e => onChange(e.target.value)} style={{ ...s, cursor: "pointer" }}>{options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select> : textarea ? <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={{ ...s, resize: "vertical", minHeight: 80 }} /> : <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={s} />}</div>);
 }
 function Crd({ children, style, onClick }) { return <div onClick={onClick} style={{ background: K.cd, border: "1px solid " + K.bd, borderRadius: 12, padding: 20, cursor: onClick ? "pointer" : "default", transition: "all 0.15s", ...style }}>{children}</div>; }
 function Mdl({ title, onClose, children, wide }) {
-  return (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }} onClick={onClose}><div onClick={e => e.stopPropagation()} style={{ background: K.sf, border: "1px solid " + K.bd, borderRadius: 16, padding: 28, width: "100%", maxWidth: wide ? 700 : 500, maxHeight: "85vh", overflowY: "auto" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}><h3 style={{ margin: 0, fontSize: 18, color: K.tx }}>{title}</h3><button onClick={onClose} style={{ background: "none", border: "none", color: K.tm, fontSize: 22, cursor: "pointer" }}>×</button></div>{children}</div></div>);
+  return (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 1000, padding: 0 }} onClick={onClose} className="tf-mdl-overlay"><div onClick={e => e.stopPropagation()} className="tf-mdl-content" style={{ background: K.sf, border: "1px solid " + K.bd, borderRadius: "16px 16px 0 0", padding: 28, width: "100%", maxWidth: wide ? 700 : 500, maxHeight: "90vh", overflowY: "auto" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}><h3 style={{ margin: 0, fontSize: 18, color: K.tx }}>{title}</h3><button onClick={onClose} style={{ background: "none", border: "none", color: K.tm, fontSize: 22, cursor: "pointer", padding: 8, minWidth: 40, minHeight: 40, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button></div>{children}</div></div>);
 }
 function Stat({ label, value, sub, icon }) { return <Crd style={{ flex: 1, minWidth: 140 }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}><div><div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: K.tm, marginBottom: 8 }}>{label}</div><div style={{ fontSize: 28, fontWeight: 700, color: K.tx, fontFamily: mf }}>{value}</div>{sub && <div style={{ fontSize: 12, color: K.td, marginTop: 4 }}>{sub}</div>}</div><div style={{ color: K.ac, opacity: 0.6 }}>{icon}</div></div></Crd>; }
 
@@ -1550,7 +1550,28 @@ export default function App() {
   const [sq, setSq] = useState("");
   const [ntf, setNtf] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [mobNav, setMobNav] = useState(false);
   const notify = (m, t = "success") => { setNtf({ m, t }); setTimeout(() => setNtf(null), 3000); };
+
+  // Responsive: detect screen size tiers + dynamic scaling
+  const [isMobile, setIsMobile] = useState(false);
+  const [isTablet, setIsTablet] = useState(false);
+  const [isCompact, setIsCompact] = useState(false);
+  const [uiScale, setUiScale] = useState(1);
+  useEffect(() => {
+    const check = () => {
+      const w = window.innerWidth;
+      setIsMobile(w < 768);
+      setIsTablet(w >= 768 && w < 1024);
+      setIsCompact(w < 1024);
+      // Dynamic scaling: 1440px→1.0x, 1920px→2.5x, capped 3.0x
+      const scale = w >= 1440 ? Math.min(3.0, 1 + (w - 1440) * 0.003125) : 1;
+      setUiScale(scale);
+    };
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -1621,10 +1642,10 @@ export default function App() {
     return (
       <Mdl title={client ? "Edit Client" : "New Client"} onClose={onClose}>
         <Inp label="Full Name" value={f.name} onChange={v => setF({ ...f, name: v })} placeholder="e.g., Sofia Marchetti" />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}><Inp label="Email" value={f.email} onChange={v => setF({ ...f, email: v })} placeholder="email@example.com" /><Inp label="Phone" value={f.phone} onChange={v => setF({ ...f, phone: v })} placeholder="+39 ..." /></div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}><Inp label="Level" value={f.level} onChange={v => setF({ ...f, level: v })} options={[{ value: "beginner", label: "Beginner" }, { value: "intermediate", label: "Intermediate" }, { value: "advanced", label: "Advanced" }]} /><Inp label="Month #" value={f.monthNumber} onChange={v => setF({ ...f, monthNumber: parseInt(v) || 1 })} type="number" /><Inp label="Start Date" value={f.startDate} onChange={v => setF({ ...f, startDate: v })} type="date" /></div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}><Inp label="Sessions / Week" value={f.sessionsPerWeek} onChange={v => setF({ ...f, sessionsPerWeek: parseInt(v) })} options={[{ value: 2, label: "2 days/week" }, { value: 3, label: "3 days/week" }, { value: 4, label: "4 days/week" }, { value: 5, label: "5 days/week" }]} /><Inp label="Session Duration" value={f.sessionDuration} onChange={v => setF({ ...f, sessionDuration: parseInt(v) })} options={[{ value: 45, label: "45 min" }, { value: 60, label: "60 min" }, { value: 75, label: "75 min" }, { value: 90, label: "90 min" }]} /></div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}><Inp label="Training Location" value={f.trainingLocation || "gym"} onChange={v => setF({ ...f, trainingLocation: v })} options={[{ value: "gym", label: "🏋️ Gym" }, { value: "home", label: "🏠 Home Gym" }]} /><Inp label="Cardio Days / Week" value={f.cardioDaysPerWeek || 0} onChange={v => setF({ ...f, cardioDaysPerWeek: parseInt(v) })} options={[{ value: 0, label: "None" }, { value: 1, label: "1 day" }, { value: 2, label: "2 days" }, { value: 3, label: "3 days" }]} /></div>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}><Inp label="Email" value={f.email} onChange={v => setF({ ...f, email: v })} placeholder="email@example.com" /><Inp label="Phone" value={f.phone} onChange={v => setF({ ...f, phone: v })} placeholder="+39 ..." /></div>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 12 }}><Inp label="Level" value={f.level} onChange={v => setF({ ...f, level: v })} options={[{ value: "beginner", label: "Beginner" }, { value: "intermediate", label: "Intermediate" }, { value: "advanced", label: "Advanced" }]} /><Inp label="Month #" value={f.monthNumber} onChange={v => setF({ ...f, monthNumber: parseInt(v) || 1 })} type="number" /><Inp label="Start Date" value={f.startDate} onChange={v => setF({ ...f, startDate: v })} type="date" /></div>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}><Inp label="Sessions / Week" value={f.sessionsPerWeek} onChange={v => setF({ ...f, sessionsPerWeek: parseInt(v) })} options={[{ value: 2, label: "2 days/week" }, { value: 3, label: "3 days/week" }, { value: 4, label: "4 days/week" }, { value: 5, label: "5 days/week" }]} /><Inp label="Session Duration" value={f.sessionDuration} onChange={v => setF({ ...f, sessionDuration: parseInt(v) })} options={[{ value: 45, label: "45 min" }, { value: 60, label: "60 min" }, { value: 75, label: "75 min" }, { value: 90, label: "90 min" }]} /></div>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}><Inp label="Training Location" value={f.trainingLocation || "gym"} onChange={v => setF({ ...f, trainingLocation: v })} options={[{ value: "gym", label: "🏋️ Gym" }, { value: "home", label: "🏠 Home Gym" }]} /><Inp label="Cardio Days / Week" value={f.cardioDaysPerWeek || 0} onChange={v => setF({ ...f, cardioDaysPerWeek: parseInt(v) })} options={[{ value: 0, label: "None" }, { value: 1, label: "1 day" }, { value: 2, label: "2 days" }, { value: 3, label: "3 days" }]} /></div>
         {f.sessionsPerWeek === 3 && <Inp label="Day 3 Focus" value={f.day3Type || "glute"} onChange={v => setF({ ...f, day3Type: v })} options={[{ value: "glute", label: "Glute Focus" }, { value: "fullbody", label: "Full Body" }]} />}
         <div style={{ background: K.ab, border: "1px solid " + K.ac + "30", borderRadius: 8, padding: 12, marginBottom: 14 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: K.ac, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Weekly Split Preview</div>
@@ -1782,27 +1803,53 @@ export default function App() {
 
   function ProgEdit({ program, prevProgram, onSave, onBack }) {
     const [p, setP] = useState(JSON.parse(JSON.stringify(program)));
-    const [ab, setAb] = useState(0);
-    const [ad, setAd] = useState(0);
     const [exPk, setExPk] = useState(null);
     const [showCmp, setShowCmp] = useState(false);
-    const cb = ab === 0 ? p.block1 : p.block2;
-    const cd = cb[ad];
-    // Auto-sync Block1 edits → Block2 with micro-progression
+    const [collDay, setCollDay] = useState({});
+
     const syncBlock2 = (np) => {
       if (!np.block1) return np;
-      np.block2 = np.block1.map(day => ({
-        ...day,
-        exercises: microProgress(day.exercises, np.level || "intermediate")
-      }));
+      np.block2 = np.block1.map(day => ({ ...day, exercises: microProgress(day.exercises, np.level || "intermediate") }));
       return np;
     };
-    const upEx = (di, ei, fld, val) => { const bk = ab === 0 ? "block1" : "block2"; const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = [...np[bk][di].exercises]; np[bk][di].exercises[ei] = { ...np[bk][di].exercises[ei], [fld]: val }; if (ab === 0) syncBlock2(np); setP(np); };
-    const rmEx = (di, ei) => { const bk = ab === 0 ? "block1" : "block2"; const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = np[bk][di].exercises.filter((_, i) => i !== ei); if (ab === 0) syncBlock2(np); setP(np); };
-    const repEx = (di, ei, nx) => { const bk = ab === 0 ? "block1" : "block2"; const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = [...np[bk][di].exercises]; const o = np[bk][di].exercises[ei]; np[bk][di].exercises[ei] = { ...nx, section: o.section, sets: o.sets, reps: o.reps, rest: o.rest, weight: o.weight, rpe: o.rpe, notes: o.notes || "" }; if (ab === 0) syncBlock2(np); setP(np); setExPk(null); };
+    const upEx = (bk, di, ei, fld, val) => {
+      const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = [...np[bk][di].exercises]; np[bk][di].exercises[ei] = { ...np[bk][di].exercises[ei], [fld]: val };
+      if (bk === "block1") syncBlock2(np);
+      setP(np);
+    };
+    const rmEx = (di, ei) => {
+      const np = { ...p }; np.block1 = [...np.block1]; np.block1[di] = { ...np.block1[di] }; np.block1[di].exercises = np.block1[di].exercises.filter((_, i) => i !== ei);
+      syncBlock2(np); setP(np);
+    };
+    const repEx = (di, ei, nx) => {
+      const np = { ...p }; np.block1 = [...np.block1]; np.block1[di] = { ...np.block1[di] }; np.block1[di].exercises = [...np.block1[di].exercises];
+      const o = np.block1[di].exercises[ei]; np.block1[di].exercises[ei] = { ...nx, section: o.section, sets: o.sets, reps: o.reps, rest: o.rest, weight: o.weight, rpe: o.rpe, notes: o.notes || "", ssGroup: o.ssGroup };
+      syncBlock2(np); setP(np); setExPk(null);
+    };
+
+    // Superset toggle: link exercise with the one below it
+    const toggleSS = (di, ei) => {
+      const np = { ...p }; np.block1 = [...np.block1]; np.block1[di] = { ...np.block1[di] }; np.block1[di].exercises = [...np.block1[di].exercises];
+      const exs = np.block1[di].exercises;
+      const ex = exs[ei];
+      if (ei >= exs.length - 1) return; // can't SS last exercise
+      const next = exs[ei + 1];
+      if (ex.ssGroup && ex.ssGroup === next.ssGroup) {
+        // Remove superset grouping
+        const gid = ex.ssGroup;
+        exs.forEach((e, i) => { if (e.ssGroup === gid) { exs[i] = { ...e }; delete exs[i].ssGroup; } });
+      } else {
+        // Create/extend superset group
+        const gid = ex.ssGroup || next.ssGroup || ("ss_" + di + "_" + ei);
+        exs[ei] = { ...ex, ssGroup: gid };
+        exs[ei + 1] = { ...next, ssGroup: gid };
+      }
+      syncBlock2(np); setP(np);
+    };
+
     const sc = s => ({ "Warm-Up": "#6eb5ff", Strength: K.ac, Core: "#b388ff", Finisher: K.dg }[s] || K.tm);
 
-    // Running (uses cardio data structure) edit helpers
+    // Running edit helpers (uses cardio data)
     const upRun = (bi, ri, fld, val) => {
       const np = { ...p, cardio: { ...(p.cardio || { block1: [], block2: [] }) } };
       const bk = bi === 0 ? "block1" : "block2";
@@ -1810,11 +1857,11 @@ export default function App() {
       np.cardio[bk][ri] = { ...np.cardio[bk][ri], [fld]: val };
       setP(np);
     };
-    const addRun = () => {
+    const addRun = (bi) => {
       const np = { ...p };
       if (!np.cardio) np.cardio = { block1: [], block2: [] };
       else np.cardio = { ...np.cardio };
-      const bk = ab === 0 ? "block1" : "block2";
+      const bk = bi === 0 ? "block1" : "block2";
       np.cardio[bk] = [...(np.cardio[bk] || []), { dayLabel: "Day 4", type: "Easy Run", warmup: "5'", work: "30' Z2", cooldown: "5'", rpe: "5" }];
       setP(np);
     };
@@ -1826,80 +1873,184 @@ export default function App() {
       setP(np);
     };
 
-    // Comparison: get previous program's exercises for current day
-    const getPrevDay = () => {
-      if (!prevProgram) return null;
-      const prevBlock = ab === 0 ? prevProgram.block1 : prevProgram.block2;
-      return prevBlock && prevBlock[ad] ? prevBlock[ad] : null;
+    // Inline fields component for one block
+    const ExFields = ({ bk, di, ei, ex }) => (
+      <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
+        {["sets","reps","weight","rpe"].map(fld => (
+          <input key={fld} value={ex[fld] || ""} onChange={e => upEx(bk, di, ei, fld, e.target.value)}
+            placeholder={fld.charAt(0).toUpperCase() + fld.slice(1)} title={fld}
+            style={{ width: fld === "weight" ? 52 : fld === "reps" ? 44 : 32, padding: "6px 3px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none", minHeight: 30 }} />
+        ))}
+      </div>
+    );
+
+    // Render one exercise row with both blocks side by side
+    const ExRow = ({ di, ei, ex1, ex2, isSSStart, isSSMid, isSSEnd }) => {
+      const ex = ex1 || ex2;
+      const ssStyle = (isSSStart || isSSMid || isSSEnd) ? { borderLeft: "3px solid #f0a030", marginLeft: 0, paddingLeft: 8 } : {};
+      const ssRadius = isSSStart ? "10px 10px 0 0" : isSSEnd ? "0 0 10px 10px" : (isSSMid ? "0" : "10px");
+      const ssMargin = (isSSMid || isSSEnd) ? 0 : 6;
+
+      if (isCompact) {
+        // COMPACT (mobile + tablet): stacked layout
+        return (
+          <div style={{ background: K.cd, border: "1px solid " + K.bd, borderRadius: ssRadius, marginBottom: ssMargin, padding: 10, ...ssStyle }}>
+            {isSSStart && <div style={{ fontSize: 9, fontWeight: 700, color: "#f0a030", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Superset</div>}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6, marginBottom: 8 }}>
+              <div style={{ color: K.tx, fontWeight: 500, fontSize: 13, cursor: "pointer", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }} onClick={() => setExPk({ di, sec: ex.section, idx: ei, rep: true })}>
+                {ex.name}
+              </div>
+              <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                <button onClick={() => toggleSS(di, ei)} title="SS" style={{ background: "none", border: "none", color: ex.ssGroup ? "#f0a030" : K.td, cursor: "pointer", padding: 4, opacity: 0.7, fontSize: 14, minWidth: 28, minHeight: 28 }}>SS</button>
+                <button onClick={() => rmEx(di, ei)} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 4, opacity: 0.5, minWidth: 28, minHeight: 28 }}>{I.trash}</button>
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div><span style={{ fontSize: 8, color: K.td }}>W1-2</span>{ex1 && <ExFields bk="block1" di={di} ei={ei} ex={ex1} />}</div>
+              <div><span style={{ fontSize: 8, color: K.td }}>W3-4</span>{ex2 && <ExFields bk="block2" di={di} ei={ei} ex={ex2} />}</div>
+            </div>
+            <div style={{ display: "flex", gap: 6, marginTop: 6, alignItems: "center", flexWrap: "wrap" }}>
+              <input value={ex1?.notes || ""} onChange={e => upEx("block1", di, ei, "notes", e.target.value)} placeholder="Notes..." style={{ padding: "3px 8px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 80 }} />
+              <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={ex1?.rest || ""} onChange={e => upEx("block1", di, ei, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>
+            </div>
+          </div>
+        );
+      }
+
+      // DESKTOP: single-row grid — name | W1-2 fields + notes | W3-4 fields + notes | SS | trash
+      return (
+        <div style={{ background: K.cd, border: "1px solid " + K.bd, borderRadius: ssRadius, marginBottom: ssMargin, padding: "8px 12px", ...ssStyle }}>
+          {isSSStart && <div style={{ fontSize: 9, fontWeight: 700, color: "#f0a030", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Superset</div>}
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(120px, 1.2fr) minmax(200px, 1fr) minmax(200px, 1fr) 28px 28px", gap: 8, alignItems: "center" }}>
+            <div style={{ color: K.tx, fontWeight: 500, fontSize: 13, cursor: "pointer", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} onClick={() => setExPk({ di, sec: ex.section, idx: ei, rep: true })}>
+              {ex.name}{ex.circuit && <span style={{ fontSize: 10, color: K.td, marginLeft: 4 }}>({ex.circuit.join(", ")})</span>}
+            </div>
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>{ex1 && <ExFields bk="block1" di={di} ei={ei} ex={ex1} />}<input value={ex1?.notes || ""} onChange={e => upEx("block1", di, ei, "notes", e.target.value)} placeholder="Notes" style={{ padding: "6px 6px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 40, minHeight: 30 }} /></div>
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>{ex2 && <ExFields bk="block2" di={di} ei={ei} ex={ex2} />}<input value={ex2?.notes || ""} onChange={e => upEx("block2", di, ei, "notes", e.target.value)} placeholder="Notes" style={{ padding: "6px 6px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 40, minHeight: 30 }} /></div>
+            <button onClick={() => toggleSS(di, ei)} title="Toggle Superset" style={{ background: "none", border: "none", color: ex.ssGroup ? "#f0a030" : K.td, cursor: "pointer", padding: 2, opacity: 0.7, fontSize: 14 }}>SS</button>
+            <button onClick={() => rmEx(di, ei)} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 2, opacity: 0.5 }}>{I.trash}</button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(120px, 1.2fr) minmax(200px, 1fr) minmax(200px, 1fr) 28px 28px", gap: 8, marginTop: 4, alignItems: "center" }}>
+            <div></div>
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={ex1?.rest || ""} onChange={e => upEx("block1", di, ei, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={ex2?.rest || ""} onChange={e => upEx("block2", di, ei, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>
+            <div></div><div></div>
+          </div>
+        </div>
+      );
     };
+
 
     return (
       <div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}><button onClick={onBack} style={{ background: "none", border: "none", color: K.tm, cursor: "pointer", padding: 4 }}>{I.back}</button><div><h2 style={{ margin: 0, fontSize: 20, color: K.tx }}>{p.clientName}</h2><div style={{ fontSize: 12, color: K.tm, display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>Month {p.monthNumber} · <LvlBadge level={p.level} /><span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>{I.cal} {p.sessionsPerWeek}×/wk</span><span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>{I.clock} {p.sessionDuration}min</span>{p.trainingLocation === "home" && <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: "rgba(200,255,46,0.15)", color: K.ac }}>🏠 HOME</span>}{p.cardioDaysPerWeek > 0 && <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: "rgba(46,204,113,0.15)", color: "#2ecc71" }}>+{p.cardioDaysPerWeek} Running</span>}</div></div></div>
-          <div style={{ display: "flex", gap: 10 }}>{prevProgram && <Btn v={showCmp ? "primary" : "secondary"} sm onClick={() => setShowCmp(!showCmp)} icon={I.history}>{showCmp ? "Hide" : "Compare"}</Btn>}<Btn v="secondary" sm onClick={() => exportPDF(p)} icon={pdfIcon}>PDF</Btn><Btn v="secondary" sm onClick={() => { setP(JSON.parse(JSON.stringify(program))); notify("Reset", "warn"); }} icon={I.refresh}>Reset</Btn><Btn v="danger" sm onClick={() => setConfDelPr(p)} icon={I.trash}>Delete</Btn><Btn sm onClick={() => { onSave(p); notify("Saved!"); }}>Save</Btn></div>
+        {/* Header */}
+        <div className="tf-prog-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, position: "sticky", top: isMobile ? 53 : 0, zIndex: 10, background: K.bg, padding: "12px 0", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}><button onClick={onBack} style={{ background: "none", border: "none", color: K.tm, cursor: "pointer", padding: 4, flexShrink: 0 }}>{I.back}</button><div style={{ minWidth: 0 }}><h2 style={{ margin: 0, fontSize: isMobile ? 16 : 20, color: K.tx, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.clientName}</h2><div style={{ fontSize: 11, color: K.tm, display: "flex", gap: 6, alignItems: "center", marginTop: 4, flexWrap: "wrap" }}>Mo.{p.monthNumber} · <LvlBadge level={p.level} /><span>{p.sessionsPerWeek}×/wk</span><span>{p.sessionDuration}min</span>{p.trainingLocation === "home" && <span style={{ padding: "2px 6px", borderRadius: 4, fontSize: 9, fontWeight: 600, background: "rgba(200,255,46,0.15)", color: K.ac }}>🏠</span>}</div></div></div>
+          <div className="tf-prog-btns" style={{ display: "flex", gap: 6, flexWrap: "wrap", flexShrink: 0 }}>{prevProgram && <Btn v={showCmp ? "primary" : "secondary"} sm onClick={() => setShowCmp(!showCmp)} icon={I.history}>{showCmp ? "Hide" : "Cmp"}</Btn>}<Btn v="secondary" sm onClick={() => exportPDF(p)} icon={pdfIcon}>PDF</Btn><Btn v="secondary" sm onClick={() => { setP(JSON.parse(JSON.stringify(program))); notify("Reset", "warn"); }} icon={I.refresh}>Reset</Btn><Btn v="danger" sm onClick={() => setConfDelPr(p)} icon={I.trash}>Del</Btn><Btn sm onClick={() => { onSave(p); notify("Saved!"); }}>Save</Btn></div>
         </div>
-        <div style={{ display: "flex", gap: 2, marginBottom: 16, background: K.sf, borderRadius: 10, padding: 3 }}>{["Block 1 — Weeks 1-2", "Block 2 — Weeks 3-4"].map((l, i) => <button key={i} onClick={() => { setAb(i); setAd(0); }} style={{ flex: 1, padding: "10px 16px", border: "none", borderRadius: 8, fontFamily: ff, fontSize: 13, fontWeight: 600, cursor: "pointer", background: ab === i ? K.ac : "transparent", color: ab === i ? "#0a0a0c" : K.tm }}>{l}</button>)}</div>
-        <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>{cb.map((d, i) => <button key={i} onClick={() => setAd(i)} style={{ padding: "8px 16px", border: "1px solid " + (ad === i ? K.ac : K.bd), borderRadius: 8, fontFamily: ff, fontSize: 12, fontWeight: 600, cursor: "pointer", background: ad === i ? K.ab : "transparent", color: ad === i ? K.ac : K.tm }}>{d.dayLabel} · {d.focus}</button>)}</div>
 
-        <div style={{ display: "flex", gap: 16 }}>
-          {/* Comparison panel */}
-          {showCmp && prevProgram && (() => {
-            const prevDay = getPrevDay();
-            const prevExs = prevDay ? (prevDay.exercises || []).filter(e => e.section === "Strength") : [];
-            return (<div style={{ width: 280, flexShrink: 0 }}>
-              <div style={{ background: K.sf, borderRadius: 10, padding: 14, position: "sticky", top: 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: K.tm, textTransform: "uppercase", marginBottom: 12 }}>Previous — Month {prevProgram.monthNumber}</div>
-                {prevExs.length === 0 ? <div style={{ fontSize: 12, color: K.td }}>No matching day</div> :
-                prevExs.map((ex, i) => {
-                  const currEx = cd.exercises.find(e => e.name === ex.name && e.section === "Strength");
-                  const currW = currEx ? parseWeight(currEx.weight) : null;
-                  const prevW = parseWeight(ex.weight);
-                  const progressed = currW && prevW && !currW.isPercent && !prevW.isPercent && currW.value > prevW.value;
-                  const same = currEx != null;
-                  return (<div key={i} style={{ padding: "8px 10px", borderRadius: 6, marginBottom: 4, background: same ? "rgba(200,255,46,0.06)" : "transparent", borderLeft: "3px solid " + (same ? (progressed ? "#2ecc71" : K.ac) : K.bd) }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: same ? K.tx : K.td }}>{ex.name}</div>
-                    <div style={{ fontSize: 11, color: K.td, marginTop: 2 }}>
-                      {ex.sets || ""}×{ex.reps || ""} · {ex.weight || "—"}{ex.rpe ? " RPE " + ex.rpe : ""}
-                      {progressed && <span style={{ color: "#2ecc71", marginLeft: 6 }}>↑</span>}
-                    </div>
-                  </div>);
-                })}
-                {prevProgram.cardio && <div style={{ marginTop: 12, borderTop: "1px solid " + K.bd, paddingTop: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#2ecc71", marginBottom: 6 }}>RUNNING</div>
-                  {(ab === 0 ? prevProgram.cardio.block1 : prevProgram.cardio.block2 || []).map((r, i) => <div key={i} style={{ fontSize: 11, color: K.td, marginBottom: 4 }}>{r.dayLabel}: {r.type} · {r.work}</div>)}
-                </div>}
-              </div>
-            </div>);
-          })()}
+        <div style={{ display: "flex", gap: 16, flexDirection: isCompact ? "column" : "row" }}>
+          {/* Comparison panel - hide on compact screens */}
+          {showCmp && prevProgram && !isCompact && <div style={{ width: 260, flexShrink: 0 }}>
+            <div style={{ background: K.sf, borderRadius: 10, padding: 14, position: "sticky", top: 80 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: K.tm, textTransform: "uppercase", marginBottom: 12 }}>Previous — Month {prevProgram.monthNumber}</div>
+              {(prevProgram.block2 || prevProgram.block1 || []).map((day, di) => {
+                const prevExs = (day.exercises || []).filter(e => e.section === "Strength");
+                if (!prevExs.length) return null;
+                return (<div key={di} style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: K.ac, marginBottom: 4 }}>{day.dayLabel}</div>
+                  {prevExs.map((ex, i) => {
+                    const currDay = p.block1[di];
+                    const currEx = currDay ? currDay.exercises.find(e => e.name === ex.name && e.section === "Strength") : null;
+                    const currW = currEx ? parseWeight(currEx.weight) : null;
+                    const prevW = parseWeight(ex.weight);
+                    const up = currW && prevW && !currW.isPercent && !prevW.isPercent && currW.value > prevW.value;
+                    return (<div key={i} style={{ fontSize: 11, color: K.td, padding: "2px 0" }}>{ex.name}: {ex.sets}×{ex.reps} · {ex.weight || "—"}{up && <span style={{ color: "#2ecc71" }}> ↑</span>}</div>);
+                  })}
+                </div>);
+              })}
+            </div>
+          </div>}
 
-          {/* Main editor */}
+          {/* All days */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div>{(() => { let ls = ""; return cd.exercises.map((ex, ei) => { const ss = ex.section !== ls; ls = ex.section; return (<div key={ei}>{ss && <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: ei > 0 ? 24 : 0, marginBottom: 10 }}><div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 3, height: 16, borderRadius: 2, background: sc(ex.section) }} /><span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: sc(ex.section) }}>{ex.section}</span></div><Btn v="ghost" sm onClick={() => setExPk({ di: ad, sec: ex.section })} icon={I.plus}>Add</Btn></div>}<div style={{ background: K.cd, border: "1px solid " + K.bd, borderRadius: 10, marginBottom: 6, padding: "10px 14px" }}><div style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto auto auto auto", gap: 8, alignItems: "center", fontSize: 13 }}><div style={{ color: K.tx, fontWeight: 500, cursor: "pointer" }} onClick={() => setExPk({ di: ad, sec: ex.section, idx: ei, rep: true })}>{ex.name}{ex.circuit && <span style={{ fontSize: 11, color: K.td, marginLeft: 6 }}>({ex.circuit.join(", ")})</span>}</div>{["sets","reps","rest","weight","rpe"].map(fld => <div key={fld} style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: fld === "reps" ? 65 : fld === "weight" ? 55 : 40 }}><span style={{ fontSize: 9, color: K.td, textTransform: "uppercase" }}>{fld}</span><input value={ex[fld]} onChange={e => upEx(ad, ei, fld, e.target.value)} style={{ width: fld === "reps" ? 70 : fld === "weight" ? 55 : 45, padding: "4px 6px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 5, color: K.tx, fontSize: 13, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>)}<button onClick={() => rmEx(ad, ei)} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 4, opacity: 0.6 }}>{I.trash}</button></div><input value={ex.notes || ""} onChange={e => upEx(ad, ei, "notes", e.target.value)} placeholder="Notes (e.g., tempo, cues, weight guidance...)" style={{ width: "100%", marginTop: 6, padding: "5px 10px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 5, color: K.tm, fontSize: 11, fontFamily: ff, outline: "none", boxSizing: "border-box" }} /></div></div>); }); })()}</div>
+            {p.block1.map((day, di) => {
+              const day2 = p.block2[di];
+              const isCollapsed = collDay[di];
+              return (
+                <div key={di} style={{ marginBottom: 24 }}>
+                  {/* Day header - collapsible */}
+                  <div onClick={() => setCollDay({ ...collDay, [di]: !isCollapsed })} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "linear-gradient(135deg, #0f1a3a, #162050)", borderRadius: isCollapsed ? 10 : "10px 10px 0 0", cursor: "pointer", userSelect: "none" }}>
+                    <span style={{ color: K.ac, fontSize: 11, transition: "transform 0.2s", transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)" }}>▼</span>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: K.tx }}>{day.dayLabel}</span>
+                    <span style={{ fontSize: 12, color: K.tm }}>{day.focus}</span>
+                    <span style={{ fontSize: 11, color: K.td, marginLeft: "auto" }}>{day.exercises.filter(e => e.section === "Strength").length} exercises</span>
+                  </div>
 
-            {/* Editable Running Section (uses cardio data) */}
-            <div style={{ marginTop: 28 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 3, height: 16, borderRadius: 2, background: "#2ecc71" }} /><span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#2ecc71" }}>Running</span></div>
-                <Btn v="ghost" sm onClick={addRun} icon={I.plus}>Add</Btn>
-              </div>
-              {p.cardio && (ab === 0 ? p.cardio.block1 : p.cardio.block2 || []).map((c, ri) => (
-                <div key={ri} style={{ background: K.cd, border: "1px solid " + K.bd, borderRadius: 10, marginBottom: 6, padding: "10px 14px" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: 8, alignItems: "center" }}>
-                    {["dayLabel","type","rpe"].map(fld => <div key={fld} style={{ display: "flex", flexDirection: "column" }}><span style={{ fontSize: 9, color: K.td, textTransform: "uppercase", marginBottom: 2 }}>{fld === "dayLabel" ? "Day" : fld === "rpe" ? "RPE" : fld}</span><input value={c[fld] || ""} onChange={e => upRun(ab, ri, fld, e.target.value)} style={{ padding: "5px 8px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 5, color: K.tx, fontSize: 12, fontFamily: ff, outline: "none", textAlign: fld === "rpe" ? "center" : "left" }} /></div>)}
-                    <button onClick={() => rmRun(ab, ri)} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 4, opacity: 0.6, alignSelf: "end", marginBottom: 2 }}>{I.trash}</button>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr 1fr", gap: 8, marginTop: 8 }}>
-                    {["warmup","work","cooldown"].map(fld => <div key={fld} style={{ display: "flex", flexDirection: "column" }}><span style={{ fontSize: 9, color: K.td, textTransform: "uppercase", marginBottom: 2 }}>{fld === "warmup" ? "Warm-up" : fld === "cooldown" ? "Cool-down" : "Work"}</span><input value={c[fld] || ""} onChange={e => upRun(ab, ri, fld, e.target.value)} style={{ padding: "5px 8px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 5, color: fld === "work" ? K.tx : K.tm, fontSize: 12, fontFamily: ff, fontWeight: fld === "work" ? 600 : 400, outline: "none" }} /></div>)}
-                  </div>
+                  {!isCollapsed && <div style={{ border: "1px solid " + K.bd, borderTop: "none", borderRadius: "0 0 10px 10px", padding: isMobile ? 8 : 12 }}>
+                    {/* Column headers - wide desktop only */}
+                    {!isCompact && <div style={{ display: "grid", gridTemplateColumns: "minmax(120px, 1.2fr) minmax(200px, 1fr) minmax(200px, 1fr) 28px 28px", gap: 8, padding: "0 12px 6px", borderBottom: "1px solid " + K.bd, marginBottom: 8 }}>
+                      <span style={{ fontSize: 10, color: K.td, fontWeight: 600 }}>EXERCISE</span>
+                      <span style={{ fontSize: 10, color: K.td, fontWeight: 600 }}>BLOCK 1 (W1-2)</span>
+                      <span style={{ fontSize: 10, color: K.td, fontWeight: 600 }}>BLOCK 2 (W3-4)</span>
+                      <span></span><span></span>
+                    </div>}
+
+                    {/* Exercises by section */}
+                    {(() => { let ls = ""; return day.exercises.map((ex1, ei) => {
+                      const ex2 = day2 ? day2.exercises[ei] : null;
+                      const secChanged = ex1.section !== ls; ls = ex1.section;
+                      const exs = day.exercises;
+                      const g = ex1.ssGroup;
+                      const isSSStart = g && (ei === 0 || exs[ei-1].ssGroup !== g);
+                      const isSSEnd = g && (ei === exs.length-1 || exs[ei+1].ssGroup !== g);
+                      const isSSMid = g && !isSSStart && !isSSEnd;
+                      return (<div key={ei}>
+                        {secChanged && <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: ei > 0 ? 16 : 0, marginBottom: 8 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 3, height: 14, borderRadius: 2, background: sc(ex1.section) }} /><span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: sc(ex1.section) }}>{ex1.section}</span></div>
+                          <Btn v="ghost" sm onClick={() => setExPk({ di, sec: ex1.section })} icon={I.plus}>Add</Btn>
+                        </div>}
+                        <ExRow di={di} ei={ei} ex1={ex1} ex2={ex2} isSSStart={isSSStart} isSSMid={isSSMid} isSSEnd={isSSEnd} />
+                      </div>);
+                    }); })()}
+                  </div>}
                 </div>
-              ))}
-              {(!p.cardio || !(ab === 0 ? p.cardio.block1 : p.cardio.block2 || []).length) && <div style={{ fontSize: 12, color: K.td, padding: 10 }}>No running days. Click + Add to create one.</div>}
+              );
+            })}
+
+            {/* Running */}
+            <div style={{ marginTop: 8, marginBottom: 24 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "linear-gradient(135deg, #0a2a1a, #103820)", borderRadius: 10, marginBottom: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: 14, color: "#2ecc71" }}>Running</span>
+              </div>
+              {[0, 1].map(bi => {
+                const rArr = p.cardio ? (p.cardio[bi === 0 ? "block1" : "block2"] || []) : [];
+                return (<div key={bi} style={{ marginBottom: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: K.tm }}>{bi === 0 ? "WEEKS 1-2" : "WEEKS 3-4"}</span>
+                    <Btn v="ghost" sm onClick={() => addRun(bi)} icon={I.plus}>Add</Btn>
+                  </div>
+                  {rArr.map((c, ri) => (
+                    <div key={ri} style={{ background: K.cd, border: "1px solid " + K.bd, borderRadius: 8, marginBottom: 4, padding: "8px 12px" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 2fr 1fr auto", gap: 6, alignItems: "center" }}>
+                        {["dayLabel","type","warmup","work","cooldown"].map(fld => (
+                          <div key={fld} style={{ display: "flex", flexDirection: "column" }}>
+                            <span style={{ fontSize: 8, color: K.td, textTransform: "uppercase" }}>{fld === "dayLabel" ? "Day" : fld === "warmup" ? "W-up" : fld === "cooldown" ? "C-down" : fld}</span>
+                            <input value={c[fld] || ""} onChange={e => upRun(bi, ri, fld, e.target.value)} style={{ padding: "3px 6px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: fld === "work" ? K.tx : K.tm, fontSize: 11, fontFamily: ff, fontWeight: fld === "work" ? 600 : 400, outline: "none" }} />
+                          </div>
+                        ))}
+                        <button onClick={() => rmRun(bi, ri)} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 2, opacity: 0.5, alignSelf: "end" }}>{I.trash}</button>
+                      </div>
+                    </div>
+                  ))}
+                  {rArr.length === 0 && <div style={{ fontSize: 11, color: K.td, padding: 6 }}>No running sessions.</div>}
+                </div>);
+              })}
             </div>
           </div>
         </div>
 
-        {exPk && <ExPick section={exPk.sec} dayType={cd.dayType} location={p.trainingLocation || "gym"} onSelect={ex => { if (exPk.rep && exPk.idx != null) { repEx(exPk.di, exPk.idx, ex); } else { const bk = ab === 0 ? "block1" : "block2"; const np = { ...p }; np[bk] = [...np[bk]]; np[bk][exPk.di] = { ...np[bk][exPk.di] }; const exs = [...np[bk][exPk.di].exercises]; const ic = ex.category === "compound"; const lc = p.levelCfg || {}; const ne = { ...ex, section: exPk.sec, sets: ic ? (lc.compoundSets || lc.cSets || 4) : (lc.accessorySets || lc.aSets || 3), reps: ic ? (lc.compoundReps || lc.cReps || "8") : (lc.accessoryReps || lc.aReps || "10"), rest: ic ? (lc.restCompound || lc.rest || 120) : (lc.restAccessory || lc.aRest || 90), weight: "—", rpe: ic ? (lc.compoundRPE || lc.cRPE || "") : (lc.accessoryRPE || lc.aRPE || ""), notes: "" }; let ia = exs.length; for (let i = exs.length - 1; i >= 0; i--) { if (exs[i].section === exPk.sec) { ia = i + 1; break; } } exs.splice(ia, 0, ne); np[bk][exPk.di].exercises = exs; if (ab === 0) syncBlock2(np); setP(np); setExPk(null); } }} onClose={() => setExPk(null)} />}
+        {exPk && <ExPick section={exPk.sec} dayType={(p.block1[exPk.di] || {}).dayType} location={p.trainingLocation || "gym"} onSelect={ex => { if (exPk.rep && exPk.idx != null) { repEx(exPk.di, exPk.idx, ex); } else { const np = { ...p }; np.block1 = [...np.block1]; np.block1[exPk.di] = { ...np.block1[exPk.di] }; const exs = [...np.block1[exPk.di].exercises]; const ic = ex.category === "compound"; const lc = p.levelCfg || {}; const ne = { ...ex, section: exPk.sec, sets: ic ? (lc.compoundSets || lc.cSets || 4) : (lc.accessorySets || lc.aSets || 3), reps: ic ? (lc.compoundReps || lc.cReps || "8") : (lc.accessoryReps || lc.aReps || "10"), rest: ic ? (lc.restCompound || lc.rest || 120) : (lc.restAccessory || lc.aRest || 90), weight: "—", rpe: ic ? (lc.compoundRPE || lc.cRPE || "") : (lc.accessoryRPE || lc.aRPE || ""), notes: "" }; let ia = exs.length; for (let i = exs.length - 1; i >= 0; i--) { if (exs[i].section === exPk.sec) { ia = i + 1; break; } } exs.splice(ia, 0, ne); np.block1[exPk.di].exercises = exs; syncBlock2(np); setP(np); setExPk(null); } }} onClose={() => setExPk(null)} />}
       </div>
     );
   }
@@ -1908,7 +2059,7 @@ export default function App() {
     const [ft, setFt] = useState("");
     const getSectionCats = () => { if (section === "Warm-Up") return ["mobility"]; if (section === "Core") return ["core"]; if (section === "Finisher") return ["hiit"]; if (section === "Strength") return ["compound_push_squat", "compound_pull_hinge", "accessory_push_squat", "accessory_pull_hinge"]; return Object.keys(EXERCISES); };
     const fl = getSectionCats().flatMap(c => filterLoc(EXERCISES[c] || [], location || "gym")).filter(e => e.name.toLowerCase().includes(ft.toLowerCase()));
-    return (<Mdl title={"Select — " + section} onClose={onClose} wide><div style={{ position: "relative", marginBottom: 16 }}><input value={ft} onChange={e => setFt(e.target.value)} placeholder="Search..." style={{ width: "100%", padding: "10px 14px 10px 36px", background: K.bg, border: "1px solid " + K.bd, borderRadius: 8, color: K.tx, fontSize: 13, fontFamily: ff, outline: "none", boxSizing: "border-box" }} /><div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: K.td }}>{I.search}</div></div><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, maxHeight: 400, overflowY: "auto" }}>{fl.map(ex => <div key={ex.id} onClick={() => onSelect(ex)} style={{ padding: "12px 14px", background: K.cd, border: "1px solid " + K.bd, borderRadius: 8, cursor: "pointer", transition: "all 0.12s" }} onMouseEnter={e => { e.currentTarget.style.borderColor = K.ac; e.currentTarget.style.background = K.ab; }} onMouseLeave={e => { e.currentTarget.style.borderColor = K.bd; e.currentTarget.style.background = K.cd; }}><div style={{ fontWeight: 600, fontSize: 13, color: K.tx, marginBottom: 4 }}>{ex.name}</div><div style={{ fontSize: 11, color: K.td }}>{ex.category}{ex.equipment ? " · " + ex.equipment : ""}{ex.muscles ? " · " + ex.muscles.join(", ") : ""}</div></div>)}</div></Mdl>);
+    return (<Mdl title={"Select — " + section} onClose={onClose} wide><div style={{ position: "relative", marginBottom: 16 }}><input value={ft} onChange={e => setFt(e.target.value)} placeholder="Search..." style={{ width: "100%", padding: "10px 14px 10px 36px", background: K.bg, border: "1px solid " + K.bd, borderRadius: 8, color: K.tx, fontSize: 13, fontFamily: ff, outline: "none", boxSizing: "border-box" }} /><div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: K.td }}>{I.search}</div></div><div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8, maxHeight: 400, overflowY: "auto" }}>{fl.map(ex => <div key={ex.id} onClick={() => onSelect(ex)} style={{ padding: "12px 14px", background: K.cd, border: "1px solid " + K.bd, borderRadius: 8, cursor: "pointer", transition: "all 0.12s" }} onMouseEnter={e => { e.currentTarget.style.borderColor = K.ac; e.currentTarget.style.background = K.ab; }} onMouseLeave={e => { e.currentTarget.style.borderColor = K.bd; e.currentTarget.style.background = K.cd; }}><div style={{ fontWeight: 600, fontSize: 13, color: K.tx, marginBottom: 4 }}>{ex.name}</div><div style={{ fontSize: 11, color: K.td }}>{ex.category}{ex.equipment ? " · " + ex.equipment : ""}{ex.muscles ? " · " + ex.muscles.join(", ") : ""}</div></div>)}</div></Mdl>);
   }
 
   // ─── PROGRAM HISTORY VIEW ───
@@ -1954,9 +2105,9 @@ export default function App() {
     return (
       <div>
         <div style={{ marginBottom: 28 }}><h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: K.tx }}>Dashboard</h1><p style={{ margin: "6px 0 0", color: K.tm, fontSize: 14 }}>Training business overview</p></div>
-        <div style={{ display: "flex", gap: 14, marginBottom: 28, flexWrap: "wrap" }}><Stat label="Active Clients" value={actCls.length} sub={cls.length + " total"} icon={I.users} /><Stat label="Programs" value={totalProgs} sub="total generated" icon={I.program} /><Stat label="Need Program" value={np.length} sub="pending" icon={I.bolt} /><Stat label="Exercises" value={ALL_EXERCISES.length} sub="in library" icon={I.library} /></div>
-        {np.length > 0 && <div style={{ marginBottom: 28 }}><h3 style={{ fontSize: 15, color: K.tx, marginBottom: 12 }}>Needs Program</h3><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>{np.map(c => <Crd key={c.id} onClick={() => { setSelCl(c); setPg("clients"); }} style={{ cursor: "pointer", borderLeft: "3px solid " + K.wn }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><div style={{ fontWeight: 600, color: K.tx, fontSize: 14 }}>{c.name}</div><div style={{ fontSize: 12, color: K.tm, marginTop: 4 }}>Month {c.monthNumber} · <LvlBadge level={c.level} /> · {c.sessionsPerWeek}×/wk · {c.sessionDuration}min</div></div><div style={{ color: K.td }}>{I.chevron}</div></div></Crd>)}</div></div>}
-        {totalProgs > 0 && <div><h3 style={{ fontSize: 15, color: K.tx, marginBottom: 12 }}>Recent Programs</h3><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>{Object.entries(prgs).flatMap(([cId, arr]) => arr.map(p => ({ ...p, _cId: cId }))).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 6).map(p => <Crd key={p.id} onClick={() => { const c = cls.find(x => x.id === p._cId); if (c) { setSelCl(c); setSelPr(p); setPg("clients"); } }} style={{ cursor: "pointer", borderLeft: "3px solid " + K.ac }}><div style={{ fontWeight: 600, color: K.tx, fontSize: 14 }}>{p.clientName}</div><div style={{ fontSize: 12, color: K.tm, marginTop: 4 }}>Month {p.monthNumber} · {p.sessionsPerWeek}×/wk · {p.sessionDuration}min · {new Date(p.createdAt).toLocaleDateString()}</div></Crd>)}</div></div>}
+        <div className="tf-stats" style={{ display: "flex", gap: 14, marginBottom: 28, flexWrap: "wrap" }}><Stat label="Active Clients" value={actCls.length} sub={cls.length + " total"} icon={I.users} /><Stat label="Programs" value={totalProgs} sub="total generated" icon={I.program} /><Stat label="Need Program" value={np.length} sub="pending" icon={I.bolt} /><Stat label="Exercises" value={ALL_EXERCISES.length} sub="in library" icon={I.library} /></div>
+        {np.length > 0 && <div style={{ marginBottom: 28 }}><h3 style={{ fontSize: 15, color: K.tx, marginBottom: 12 }}>Needs Program</h3><div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>{np.map(c => <Crd key={c.id} onClick={() => { setSelCl(c); setPg("clients"); }} style={{ cursor: "pointer", borderLeft: "3px solid " + K.wn }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><div style={{ fontWeight: 600, color: K.tx, fontSize: 14 }}>{c.name}</div><div style={{ fontSize: 12, color: K.tm, marginTop: 4 }}>Month {c.monthNumber} · <LvlBadge level={c.level} /> · {c.sessionsPerWeek}×/wk · {c.sessionDuration}min</div></div><div style={{ color: K.td }}>{I.chevron}</div></div></Crd>)}</div></div>}
+        {totalProgs > 0 && <div><h3 style={{ fontSize: 15, color: K.tx, marginBottom: 12 }}>Recent Programs</h3><div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>{Object.entries(prgs).flatMap(([cId, arr]) => arr.map(p => ({ ...p, _cId: cId }))).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 6).map(p => <Crd key={p.id} onClick={() => { const c = cls.find(x => x.id === p._cId); if (c) { setSelCl(c); setSelPr(p); setPg("clients"); } }} style={{ cursor: "pointer", borderLeft: "3px solid " + K.ac }}><div style={{ fontWeight: 600, color: K.tx, fontSize: 14 }}>{p.clientName}</div><div style={{ fontSize: 12, color: K.tm, marginTop: 4 }}>Month {p.monthNumber} · {p.sessionsPerWeek}×/wk · {p.sessionDuration}min · {new Date(p.createdAt).toLocaleDateString()}</div></Crd>)}</div></div>}
       </div>
     );
   }
@@ -1972,29 +2123,29 @@ export default function App() {
       return (
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}><button onClick={() => setSelCl(null)} style={{ background: "none", border: "none", color: K.tm, cursor: "pointer", padding: 4 }}>{I.back}</button><h2 style={{ margin: 0, fontSize: 22, color: K.tx }}>{c.name}</h2><LvlBadge level={c.level} /></div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+          <div className="tf-grid-resp" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
             <Crd><h4 style={{ margin: "0 0 12px", fontSize: 13, color: K.tm, textTransform: "uppercase" }}>Details</h4><div style={{ fontSize: 13, color: K.tx, lineHeight: 2 }}><div><span style={{ color: K.td }}>Email:</span> {c.email}</div><div><span style={{ color: K.td }}>Phone:</span> {c.phone}</div><div><span style={{ color: K.td }}>Start:</span> {c.startDate}</div><div><span style={{ color: K.td }}>Month:</span> {c.monthNumber}</div><div><span style={{ color: K.td }}>Location:</span> {c.trainingLocation === "home" ? "🏠 Home Gym" : "🏋️ Gym"}</div><div><span style={{ color: K.td }}>Sessions:</span> {c.sessionsPerWeek}×/week</div><div><span style={{ color: K.td }}>Duration:</span> {c.sessionDuration} min</div><div><span style={{ color: K.td }}>Cardio:</span> {(c.cardioDaysPerWeek || 0) > 0 ? c.cardioDaysPerWeek + " days/week" : c.includesRunning ? "Running" : "No"}</div></div></Crd>
             <Crd><h4 style={{ margin: "0 0 12px", fontSize: 13, color: K.tm, textTransform: "uppercase" }}>Goals & Health</h4><div style={{ fontSize: 13, color: K.tx, lineHeight: 2 }}><div><span style={{ color: K.td }}>Goals:</span> {c.goals}</div><div><span style={{ color: K.td }}>Health:</span> {c.healthNotes || "None"}</div><div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}><span style={{ color: K.td }}>Injuries:</span>{c.injuries?.length ? c.injuries.map((inj, i) => <Badge key={i} color={K.dg}>{inj}</Badge>) : <span style={{ color: K.td }}>None</span>}</div></div></Crd>
           </div>
           <Crd style={{ marginBottom: 24, background: K.ab, borderColor: K.ac + "30" }}><div style={{ fontSize: 12, fontWeight: 600, color: K.ac, textTransform: "uppercase", marginBottom: 8 }}>Weekly Schedule</div><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{buildDaySchedule(c.sessionsPerWeek, c.day3Type || "glute").map((t, i) => { const labels = { A: "Push+Squat", B: "Pull+Hinge", Q: "Quad+Push", H: "Hinge+Pull", G: "Glute Focus", F: "Full Body" }; const colors = { A: "#5dade2", B: "#f0a030", Q: "#5dade2", H: "#f0a030", G: "#e74c3c", F: "#2ecc71" }; return <div key={i} style={{ padding: "8px 14px", borderRadius: 8, background: colors[t] + "20", border: "1px solid " + colors[t] + "50" }}><div style={{ fontSize: 11, fontWeight: 700, color: colors[t], marginBottom: 2 }}>Day {i+1}</div><div style={{ fontSize: 12, color: K.tx }}>{labels[t]}</div></div>; })}{c.includesRunning && <div style={{ padding: "8px 14px", borderRadius: 8, background: "rgba(46,204,113,0.12)", border: "1px solid rgba(46,204,113,0.3)" }}><div style={{ fontSize: 11, fontWeight: 700, color: K.ok, marginBottom: 2 }}>Off-Day</div><div style={{ fontSize: 12, color: K.tx }}>Running</div></div>}</div></Crd>
-          <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap" }}>
-            <Btn onClick={handleGenerate} icon={I.bolt}>{cp ? "Generate Month " + ((cp.monthNumber || 1) + 1) : "Generate Program"}</Btn>
-            {cp && <Btn v="secondary" onClick={() => setSelPr(cp)} icon={I.edit}>Edit Current</Btn>}
-            {cp && <Btn v="secondary" onClick={() => exportPDF(cp)} icon={pdfIcon}>Export PDF</Btn>}
-            {allP.length > 0 && <Btn v="secondary" onClick={() => setHistCl(c)} icon={I.history}>History ({allP.length})</Btn>}
-            <Btn v="secondary" onClick={() => { setEditCl(c); setShowCM(true); }} icon={I.edit}>Edit Client</Btn>
-            <Btn v="danger" onClick={() => setConfDel(c)} icon={I.trash}>Delete Client</Btn>
+          <div style={{ display: "flex", gap: isMobile ? 6 : 10, marginBottom: 24, flexWrap: "wrap" }}>
+            <Btn onClick={handleGenerate} icon={I.bolt} sm={isMobile}>{cp ? (isMobile ? "Gen Mo." + ((cp.monthNumber || 1) + 1) : "Generate Month " + ((cp.monthNumber || 1) + 1)) : "Generate Program"}</Btn>
+            {cp && <Btn v="secondary" onClick={() => setSelPr(cp)} icon={I.edit} sm={isMobile}>{isMobile ? "Edit" : "Edit Current"}</Btn>}
+            {cp && <Btn v="secondary" onClick={() => exportPDF(cp)} icon={pdfIcon} sm={isMobile}>PDF</Btn>}
+            {allP.length > 0 && <Btn v="secondary" onClick={() => setHistCl(c)} icon={I.history} sm={isMobile}>History ({allP.length})</Btn>}
+            <Btn v="secondary" onClick={() => { setEditCl(c); setShowCM(true); }} icon={I.edit} sm={isMobile}>{isMobile ? "Edit" : "Edit Client"}</Btn>
+            <Btn v="danger" onClick={() => setConfDel(c)} icon={I.trash} sm={isMobile}>{isMobile ? "Del" : "Delete Client"}</Btn>
           </div>
-          {cp && <Crd style={{ marginBottom: 16 }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><h4 style={{ margin: 0, fontSize: 14, color: K.tx }}>Current Program — Month {cp.monthNumber}</h4><span style={{ fontSize: 11, color: K.td }}>{new Date(cp.createdAt).toLocaleDateString()}</span></div><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>{["Block 1 (Wk 1-2)", "Block 2 (Wk 3-4)"].map((l, bi) => <div key={bi} style={{ background: K.bg, borderRadius: 8, padding: 14 }}><div style={{ fontSize: 12, fontWeight: 600, color: K.ac, marginBottom: 10 }}>{l}</div>{(bi === 0 ? cp.block1 : cp.block2).map((d, di) => <div key={di} style={{ marginBottom: 8 }}><div style={{ fontSize: 12, fontWeight: 600, color: K.tx }}>{d.dayLabel}: {d.focus}</div><div style={{ fontSize: 11, color: K.td }}>{d.exercises.length} exercises</div></div>)}</div>)}</div></Crd>}
+          {cp && <Crd style={{ marginBottom: 16 }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><h4 style={{ margin: 0, fontSize: 14, color: K.tx }}>Current Program — Month {cp.monthNumber}</h4><span style={{ fontSize: 11, color: K.td }}>{new Date(cp.createdAt).toLocaleDateString()}</span></div><div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>{["Block 1 (Wk 1-2)", "Block 2 (Wk 3-4)"].map((l, bi) => <div key={bi} style={{ background: K.bg, borderRadius: 8, padding: 14 }}><div style={{ fontSize: 12, fontWeight: 600, color: K.ac, marginBottom: 10 }}>{l}</div>{(bi === 0 ? cp.block1 : cp.block2).map((d, di) => <div key={di} style={{ marginBottom: 8 }}><div style={{ fontSize: 12, fontWeight: 600, color: K.tx }}>{d.dayLabel}: {d.focus}</div><div style={{ fontSize: 11, color: K.td }}>{d.exercises.length} exercises</div></div>)}</div>)}</div></Crd>}
           {allP.length > 1 && <Crd><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><h4 style={{ margin: 0, fontSize: 14, color: K.tx }}>Program Timeline</h4><Btn v="ghost" sm onClick={() => setHistCl(c)} icon={I.history}>View All</Btn></div><div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>{allP.map((prog, i) => { const isLast = i === allP.length - 1; return <div key={prog.id} onClick={() => setSelPr(prog)} style={{ minWidth: 120, padding: "10px 14px", borderRadius: 8, background: isLast ? K.ab : K.bg, border: "1px solid " + (isLast ? K.ac + "50" : K.bd), cursor: "pointer", textAlign: "center", flexShrink: 0 }}><div style={{ fontSize: 18, fontWeight: 700, color: isLast ? K.ac : K.tx, fontFamily: mf }}>{prog.monthNumber}</div><div style={{ fontSize: 10, color: K.td, marginTop: 2 }}>Month</div><div style={{ fontSize: 10, color: K.tm, marginTop: 4 }}>{new Date(prog.createdAt).toLocaleDateString("it-IT", { day: "numeric", month: "short" })}</div></div>; })}</div></Crd>}
         </div>
       );
     }
     return (
       <div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}><div><h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: K.tx }}>Clients</h1><p style={{ margin: "6px 0 0", color: K.tm, fontSize: 14 }}>{actCls.length} active</p></div><div style={{ display: "flex", gap: 10 }}><Btn v="secondary" onClick={() => setShowImport(true)} icon={I.upload}>Import</Btn><Btn onClick={() => { setEditCl(null); setShowCM(true); }} icon={I.plus}>New Client</Btn></div></div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: isMobile ? "flex-start" : "center", marginBottom: 24, flexDirection: isMobile ? "column" : "row", gap: isMobile ? 12 : 0 }}><div><h1 style={{ margin: 0, fontSize: isMobile ? 22 : 26, fontWeight: 700, color: K.tx }}>Clients</h1><p style={{ margin: "6px 0 0", color: K.tm, fontSize: 14 }}>{actCls.length} active</p></div><div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}><Btn v="secondary" onClick={() => setShowImport(true)} icon={I.upload}>Import</Btn><Btn onClick={() => { setEditCl(null); setShowCM(true); }} icon={I.plus}>New Client</Btn></div></div>
         <div style={{ position: "relative", marginBottom: 20 }}><input value={sq} onChange={e => setSq(e.target.value)} placeholder="Search..." style={{ width: "100%", padding: "12px 16px 12px 40px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 10, color: K.tx, fontSize: 14, fontFamily: ff, outline: "none", boxSizing: "border-box" }} /><div style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: K.td }}>{I.search}</div></div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>{fl.map(c => { const lp = getLatest(prgs, c.id); const pc = getAll(prgs, c.id).length; return <Crd key={c.id} onClick={() => setSelCl(c)} style={{ cursor: "pointer", borderLeft: "3px solid " + (lp ? K.ac : K.bd) }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}><div><div style={{ fontWeight: 600, color: K.tx, fontSize: 15, marginBottom: 6 }}>{c.name}</div><div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}><LvlBadge level={c.level} /><span style={{ fontSize: 12, color: K.tm }}>Mo.{c.monthNumber} · {c.sessionsPerWeek}×/wk · {c.sessionDuration}min</span>{c.trainingLocation === "home" && <Badge color={K.ac}>🏠 Home</Badge>}{(c.cardioDaysPerWeek || 0) > 0 && <Badge color="#2ecc71">+{c.cardioDaysPerWeek} Running</Badge>}</div><div style={{ fontSize: 12, color: K.td }}>{c.goals}</div></div><div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>{lp ? <Badge color={K.ac}>Mo.{lp.monthNumber} ✓</Badge> : <Badge color={K.wn}>Pending</Badge>}{pc > 1 && <span style={{ fontSize: 10, color: K.td }}>{pc} programs</span>}<div style={{ display: "flex", alignItems: "center", gap: 8 }}><button onClick={e => { e.stopPropagation(); setConfDel(c); }} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 4, borderRadius: 4, display: "flex", alignItems: "center" }} title="Delete">{I.trash}</button><div style={{ color: K.td }}>{I.chevron}</div></div></div></div></Crd>; })}</div>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>{fl.map(c => { const lp = getLatest(prgs, c.id); const pc = getAll(prgs, c.id).length; return <Crd key={c.id} onClick={() => setSelCl(c)} style={{ cursor: "pointer", borderLeft: "3px solid " + (lp ? K.ac : K.bd) }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}><div><div style={{ fontWeight: 600, color: K.tx, fontSize: 15, marginBottom: 6 }}>{c.name}</div><div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}><LvlBadge level={c.level} /><span style={{ fontSize: 12, color: K.tm }}>Mo.{c.monthNumber} · {c.sessionsPerWeek}×/wk · {c.sessionDuration}min</span>{c.trainingLocation === "home" && <Badge color={K.ac}>🏠 Home</Badge>}{(c.cardioDaysPerWeek || 0) > 0 && <Badge color="#2ecc71">+{c.cardioDaysPerWeek} Running</Badge>}</div><div style={{ fontSize: 12, color: K.td }}>{c.goals}</div></div><div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>{lp ? <Badge color={K.ac}>Mo.{lp.monthNumber} ✓</Badge> : <Badge color={K.wn}>Pending</Badge>}{pc > 1 && <span style={{ fontSize: 10, color: K.td }}>{pc} programs</span>}<div style={{ display: "flex", alignItems: "center", gap: 8 }}><button onClick={e => { e.stopPropagation(); setConfDel(c); }} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 4, borderRadius: 4, display: "flex", alignItems: "center" }} title="Delete">{I.trash}</button><div style={{ color: K.td }}>{I.chevron}</div></div></div></div></Crd>; })}</div>
       </div>
     );
   }
@@ -2002,12 +2153,12 @@ export default function App() {
   function Programs() {
     if (selPr) { const allPr = getAll(prgs, selPr.clientId); const prIdx = allPr.findIndex(x => x.id === selPr.id); const prevPr = prIdx > 0 ? allPr[prIdx - 1] : null; return <ProgEdit program={selPr} prevProgram={prevPr} onSave={u => { setPrgs(updProg(prgs, u.clientId, u)); setSelPr(u); dbSave("programs", prToDb(u)).catch(console.error); }} onBack={() => setSelPr(null)} />; }
     const all = Object.entries(prgs).flatMap(([, arr]) => arr).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    return (<div><div style={{ marginBottom: 24 }}><h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: K.tx }}>Programs</h1><p style={{ margin: "6px 0 0", color: K.tm, fontSize: 14 }}>{all.length} programs</p></div>{all.length === 0 ? <Crd style={{ textAlign: "center", padding: 40 }}><div style={{ color: K.td, fontSize: 14 }}>No programs yet.</div></Crd> : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>{all.map(p => <Crd key={p.id} onClick={() => setSelPr(p)} style={{ cursor: "pointer" }}><div style={{ fontWeight: 600, color: K.tx, fontSize: 15, marginBottom: 6 }}>{p.clientName}</div><div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}><LvlBadge level={p.level} /><span style={{ fontSize: 12, color: K.tm }}>Mo.{p.monthNumber} · {p.sessionsPerWeek}×/wk · {p.sessionDuration}min</span></div><div style={{ fontSize: 12, color: K.td }}>{p.block1.reduce((a, d) => a + d.exercises.length, 0) + p.block2.reduce((a, d) => a + d.exercises.length, 0)} exercises · {new Date(p.createdAt).toLocaleDateString()}</div></Crd>)}</div>}</div>);
+    return (<div><div style={{ marginBottom: 24 }}><h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: K.tx }}>Programs</h1><p style={{ margin: "6px 0 0", color: K.tm, fontSize: 14 }}>{all.length} programs</p></div>{all.length === 0 ? <Crd style={{ textAlign: "center", padding: 40 }}><div style={{ color: K.td, fontSize: 14 }}>No programs yet.</div></Crd> : <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>{all.map(p => <Crd key={p.id} onClick={() => setSelPr(p)} style={{ cursor: "pointer" }}><div style={{ fontWeight: 600, color: K.tx, fontSize: 15, marginBottom: 6 }}>{p.clientName}</div><div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}><LvlBadge level={p.level} /><span style={{ fontSize: 12, color: K.tm }}>Mo.{p.monthNumber} · {p.sessionsPerWeek}×/wk · {p.sessionDuration}min</span></div><div style={{ fontSize: 12, color: K.td }}>{p.block1.reduce((a, d) => a + d.exercises.length, 0) + p.block2.reduce((a, d) => a + d.exercises.length, 0)} exercises · {new Date(p.createdAt).toLocaleDateString()}</div></Crd>)}</div>}</div>);
   }
 
   function Library() {
     const [ac, setAc] = useState("compound_push_squat");
-    return (<div><div style={{ marginBottom: 24 }}><h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: K.tx }}>Exercise Library</h1><p style={{ margin: "6px 0 0", color: K.tm, fontSize: 14 }}>{ALL_EXERCISES.length} exercises</p></div><div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>{Object.keys(EXERCISES).map(cat => <button key={cat} onClick={() => setAc(cat)} style={{ padding: "8px 16px", border: "1px solid " + (ac === cat ? K.ac : K.bd), borderRadius: 8, fontFamily: ff, fontSize: 12, fontWeight: 600, cursor: "pointer", background: ac === cat ? K.ab : "transparent", color: ac === cat ? K.ac : K.tm, textTransform: "capitalize" }}>{cat.replace(/_/g, " ")} ({EXERCISES[cat].length})</button>)}</div><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(250px,1fr))", gap: 10 }}>{EXERCISES[ac].map(ex => <Crd key={ex.id} style={{ padding: 16 }}><div style={{ fontWeight: 600, fontSize: 14, color: K.tx, marginBottom: 6 }}>{ex.name}</div><div style={{ fontSize: 12, color: K.td }}>{ex.equipment ? "Equipment: " + ex.equipment : ""}{ex.muscles ? " · " + ex.muscles.join(", ") : ""}</div></Crd>)}</div></div>);
+    return (<div><div style={{ marginBottom: 24 }}><h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: K.tx }}>Exercise Library</h1><p style={{ margin: "6px 0 0", color: K.tm, fontSize: 14 }}>{ALL_EXERCISES.length} exercises</p></div><div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: isMobile ? "nowrap" : "wrap", overflowX: isMobile ? "auto" : "visible", WebkitOverflowScrolling: "touch", paddingBottom: isMobile ? 4 : 0 }}>{Object.keys(EXERCISES).map(cat => <button key={cat} onClick={() => setAc(cat)} style={{ padding: "8px 16px", border: "1px solid " + (ac === cat ? K.ac : K.bd), borderRadius: 8, fontFamily: ff, fontSize: 12, fontWeight: 600, cursor: "pointer", background: ac === cat ? K.ab : "transparent", color: ac === cat ? K.ac : K.tm, textTransform: "capitalize", whiteSpace: "nowrap", flexShrink: 0 }}>{cat.replace(/_/g, " ")} ({EXERCISES[cat].length})</button>)}</div><div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fill,minmax(250px,1fr))", gap: 10 }}>{EXERCISES[ac].map(ex => <Crd key={ex.id} style={{ padding: 16 }}><div style={{ fontWeight: 600, fontSize: 14, color: K.tx, marginBottom: 6 }}>{ex.name}</div><div style={{ fontSize: 12, color: K.td }}>{ex.equipment ? "Equipment: " + ex.equipment : ""}{ex.muscles ? " · " + ex.muscles.join(", ") : ""}</div></Crd>)}</div></div>);
   }
 
   const nav = [{ id: "dashboard", label: "Dashboard", icon: I.dashboard }, { id: "clients", label: "Clients", icon: I.users }, { id: "programs", label: "Programs", icon: I.program }, { id: "library", label: "Library", icon: I.library }];
@@ -2023,19 +2174,75 @@ export default function App() {
     </div>
   );
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: K.bg, fontFamily: ff, color: K.tx }}>
+    <div className="tf-root" style={{ display: "flex", flexDirection: isMobile ? "column" : "row", minHeight: uiScale > 1 ? (100 / uiScale) + "vh" : "100vh", background: K.bg, fontFamily: ff, color: K.tx, WebkitTextSizeAdjust: "100%", zoom: uiScale > 1 ? uiScale : undefined }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-      <nav style={{ width: 220, minHeight: "100vh", background: K.sf, borderRight: "1px solid " + K.bd, padding: "20px 0", display: "flex", flexDirection: "column", flexShrink: 0 }}>
+      <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+
+      {/* Desktop sidebar */}
+      {!isMobile && <nav style={{ width: 220, minHeight: uiScale > 1 ? (100 / uiScale) + "vh" : "100vh", background: K.sf, borderRight: "1px solid " + K.bd, padding: "20px 0", display: "flex", flexDirection: "column", flexShrink: 0 }}>
         <div style={{ padding: "0 20px 24px", borderBottom: "1px solid " + K.bd, marginBottom: 16 }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ width: 32, height: 32, borderRadius: 8, background: K.ac, display: "flex", alignItems: "center", justifyContent: "center", color: "#0a0a0c" }}>{I.bolt}</div><div><div style={{ fontWeight: 700, fontSize: 15, color: K.tx, letterSpacing: "-0.02em" }}>TrainForge</div><div style={{ fontSize: 10, color: K.td, textTransform: "uppercase", letterSpacing: "0.08em" }}>Pro Dashboard</div></div></div></div>
         {nav.map(n => <button key={n.id} onClick={() => { setPg(n.id); setSelCl(null); setSelPr(null); }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 20px", border: "none", background: pg === n.id ? K.ab : "transparent", color: pg === n.id ? K.ac : K.tm, fontFamily: ff, fontSize: 13, fontWeight: 600, cursor: "pointer", borderLeft: pg === n.id ? "2px solid " + K.ac : "2px solid transparent", width: "100%", textAlign: "left" }}>{n.icon}{n.label}</button>)}
-      </nav>
-      <main style={{ flex: 1, padding: "28px 36px", overflowY: "auto", maxHeight: "100vh" }}>{pg === "dashboard" && <Dash />}{pg === "clients" && <Clients />}{pg === "programs" && <Programs />}{pg === "library" && <Library />}</main>
+      </nav>}
+
+      {/* Mobile top bar */}
+      {isMobile && <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: K.sf, borderBottom: "1px solid " + K.bd, position: "sticky", top: 0, zIndex: 50 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 7, background: K.ac, display: "flex", alignItems: "center", justifyContent: "center", color: "#0a0a0c" }}>{I.bolt}</div>
+          <div style={{ fontWeight: 700, fontSize: 14, color: K.tx }}>TrainForge</div>
+        </div>
+      </div>}
+
+      <main style={{ flex: 1, padding: isMobile ? "16px 12px 90px" : isTablet ? "20px 20px" : "28px 36px", overflowY: "auto", maxHeight: isMobile ? undefined : uiScale > 1 ? (100 / uiScale) + "vh" : "100vh" }}>{pg === "dashboard" && <Dash />}{pg === "clients" && <Clients />}{pg === "programs" && <Programs />}{pg === "library" && <Library />}</main>
+
+      {/* Mobile bottom tab bar */}
+      {isMobile && <nav className="tf-bottom-nav" style={{ position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: K.sf, borderTop: "1px solid " + K.bd, zIndex: 50, paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+        {nav.map(n => <button key={n.id} onClick={() => { setPg(n.id); setSelCl(null); setSelPr(null); }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "10px 4px", border: "none", background: pg === n.id ? K.ab : "transparent", color: pg === n.id ? K.ac : K.tm, fontFamily: ff, fontSize: 10, fontWeight: 600, cursor: "pointer", borderTop: pg === n.id ? "2px solid " + K.ac : "2px solid transparent" }}>{n.icon}<span>{n.label}</span></button>)}
+      </nav>}
       {showCM && <ClForm client={editCl} onClose={() => { setShowCM(false); setEditCl(null); }} onSave={c => { if (editCl) { setCls(cls.map(x => x.id === c.id ? c : x)); if (selCl?.id === c.id) setSelCl(c); } else setCls([...cls, c]); dbSave("clients", clToDb(c)).catch(console.error); setShowCM(false); setEditCl(null); notify(editCl ? "Updated!" : "Added!"); }} />}
       {confDel && <Mdl title="Delete Client" onClose={() => setConfDel(null)}><p style={{ color: K.tm, fontSize: 14, marginBottom: 8 }}>Are you sure you want to delete <strong style={{ color: K.tx }}>{confDel.name}</strong>?</p><p style={{ color: K.dg, fontSize: 13, marginBottom: 20 }}>This will also delete all {(getAll(prgs, confDel.id) || []).length} associated programs. This action cannot be undone.</p><div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}><Btn v="secondary" onClick={() => setConfDel(null)}>Cancel</Btn><Btn v="danger" onClick={() => { const cId = confDel.id; dbDelete("clients", cId).catch(console.error); (getAll(prgs, cId) || []).forEach(p => dbDelete("programs", p.id).catch(console.error)); setCls(cls.filter(c => c.id !== cId)); const np = { ...prgs }; delete np[cId]; setPrgs(np); if (selCl?.id === cId) { setSelCl(null); setSelPr(null); } setConfDel(null); notify("Client deleted", "warn"); }}>Delete</Btn></div></Mdl>}
       {confDelPr && <Mdl title="Delete Program" onClose={() => setConfDelPr(null)}><p style={{ color: K.tm, fontSize: 14, marginBottom: 8 }}>Delete <strong style={{ color: K.tx }}>{confDelPr.clientName} — Month {confDelPr.monthNumber}</strong>?</p><p style={{ color: K.dg, fontSize: 13, marginBottom: 20 }}>This action cannot be undone.</p><div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}><Btn v="secondary" onClick={() => setConfDelPr(null)}>Cancel</Btn><Btn v="danger" onClick={() => { const p = confDelPr; dbDelete("programs", p.id).catch(console.error); const np = { ...prgs, [p.clientId]: (prgs[p.clientId] || []).filter(x => x.id !== p.id) }; if (np[p.clientId].length === 0) delete np[p.clientId]; setPrgs(np); if (selPr?.id === p.id) setSelPr(null); setConfDelPr(null); notify("Program deleted", "warn"); }}>Delete</Btn></div></Mdl>}
       {showImport && <ImportModal cls={cls} setCls={setCls} prgs={prgs} setPrgs={setPrgs} onClose={() => setShowImport(false)} notify={notify} dbSave={dbSave} clToDb={clToDb} prToDb={prToDb} />}
-      {ntf && <div style={{ position: "fixed", bottom: 24, right: 24, padding: "12px 20px", borderRadius: 10, background: ntf.t === "warn" ? "#332800" : "#0a2e12", border: "1px solid " + (ntf.t === "warn" ? K.wn : K.ok) + "30", color: ntf.t === "warn" ? K.wn : K.ok, fontSize: 13, fontWeight: 600, fontFamily: ff, display: "flex", alignItems: "center", gap: 8, zIndex: 2000, animation: "slideUp 0.3s ease" }}>{I.check} {ntf.m}</div>}
-      <style>{`@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}*{box-sizing:border-box}::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:${K.bg}}::-webkit-scrollbar-thumb{background:${K.bd};border-radius:3px}select option{background:${K.sf};color:${K.tx}}input:focus,select:focus,textarea:focus{border-color:${K.ac}!important}`}</style>
+      {ntf && <div className="tf-notif" style={{ position: "fixed", bottom: isMobile ? 80 : 24, right: isMobile ? 12 : 24, left: isMobile ? 12 : "auto", padding: "12px 20px", borderRadius: 10, background: ntf.t === "warn" ? "#332800" : "#0a2e12", border: "1px solid " + (ntf.t === "warn" ? K.wn : K.ok) + "30", color: ntf.t === "warn" ? K.wn : K.ok, fontSize: 13, fontWeight: 600, fontFamily: ff, display: "flex", alignItems: "center", gap: 8, zIndex: 2000, animation: "slideUp 0.3s ease", justifyContent: "center" }}>{I.check} {ntf.m}</div>}
+      <style>{`
+        @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+        *{box-sizing:border-box}
+        ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:${K.bg}}::-webkit-scrollbar-thumb{background:${K.bd};border-radius:3px}
+        ::-webkit-scrollbar-thumb:hover{background:${K.tm}}
+        select option{background:${K.sf};color:${K.tx}}
+        input:focus,select:focus,textarea:focus{border-color:${K.ac}!important}
+        
+        /* Desktop modal centering */
+        @media(min-width:768px){
+          .tf-mdl-overlay{align-items:center!important;padding:20px!important}
+          .tf-mdl-content{border-radius:16px!important}
+        }
+        /* Tablet: 768-1023 */
+        @media(min-width:768px) and (max-width:1023px){
+          .tf-root h1{font-size:24px!important}
+          .tf-stats>div{min-width:calc(50% - 8px)!important;flex:none!important;width:calc(50% - 8px)!important}
+        }
+        /* Mobile: <768 */
+        @media(max-width:767px){
+          .tf-root h1{font-size:22px!important}
+          .tf-root h2{font-size:18px!important}
+          .tf-grid-resp{grid-template-columns:1fr!important}
+          .tf-prog-header{flex-direction:column!important;align-items:stretch!important;gap:10px!important}
+          .tf-prog-header>div{flex-wrap:wrap!important}
+          .tf-prog-btns{flex-wrap:wrap!important;justify-content:flex-start!important}
+          .tf-prog-btns button{font-size:11px!important;padding:8px 10px!important}
+          .tf-exrow-grid{grid-template-columns:1fr!important;gap:8px!important}
+          .tf-exrow-fields{flex-wrap:wrap!important}
+          .tf-exrow-fields input{min-width:40px!important}
+          .tf-day-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+          .tf-form-grid2,.tf-form-grid3{grid-template-columns:1fr!important}
+          .tf-stats{gap:10px!important}
+          .tf-stats>div{min-width:calc(50% - 6px)!important;flex:none!important;width:calc(50% - 6px)!important}
+          .tf-notif{left:12px!important;right:12px!important;bottom:80px!important}
+        }
+        @media(max-width:400px){
+          .tf-stats>div{min-width:100%!important;width:100%!important}
+        }
+      `}</style>
     </div>
   );
 }
