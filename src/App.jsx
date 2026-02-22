@@ -90,6 +90,7 @@ const EXERCISES = {
     { id: "aps23", name: "DB Bridged Floor Press", category: "accessory", equipment: "dumbbells", muscles: ["chest", "glutes"], focus: "A" },
     { id: "aps24", name: "Dip su Sedia", category: "accessory", equipment: "chair", muscles: ["triceps"], focus: "A" },
     { id: "aps25", name: "SL Goblet Squat (Chair)", category: "accessory", equipment: "dumbbell/chair", muscles: ["quads", "glutes"], focus: "A" },
+    { id: "aps26", name: "French Press", category: "accessory", equipment: "barbell/dumbbells", muscles: ["triceps"], focus: "A" },
   ],
   accessory_pull_hinge: [
     { id: "aph1", name: "Hip Thrust", category: "accessory", equipment: "barbell", muscles: ["glutes"], focus: "B" },
@@ -118,6 +119,7 @@ const EXERCISES = {
     { id: "aph24", name: "Plank Row (Chair)", category: "accessory", equipment: "dumbbell/chair", muscles: ["back"], focus: "B" },
     { id: "aph25", name: "Bicep Curls DB", category: "accessory", equipment: "dumbbells", muscles: ["biceps"], focus: "B" },
     { id: "aph26", name: "DB Tricep Extension", category: "accessory", equipment: "dumbbells", muscles: ["triceps"], focus: "B" },
+    { id: "aph27", name: "Rear Delt Fly", category: "accessory", equipment: "dumbbells", muscles: ["rear delts", "upper back"], focus: "B" },
   ],
   core: [
     { id: "co1", name: "Plank", category: "core", equipment: "none" },
@@ -136,6 +138,10 @@ const EXERCISES = {
     { id: "co14", name: "Plank Drag Through", category: "core", equipment: "dumbbell" },
     { id: "co15", name: "Plank Reach", category: "core", equipment: "none" },
     { id: "co16", name: "Reverse Crunch", category: "core", equipment: "none" },
+    { id: "co17", name: "Windmill (KB)", category: "core", equipment: "kettlebell" },
+    { id: "co18", name: "Kneeling Halo", category: "core", equipment: "kettlebell" },
+    { id: "co19", name: "Stir The Pot Fitball", category: "core", equipment: "fitball" },
+    { id: "co20", name: "Plank Side Fitball", category: "core", equipment: "fitball" },
   ],
   hiit: [
     { id: "h1", name: "Burpees", category: "hiit", equipment: "none" },
@@ -1547,22 +1553,25 @@ export default function App() {
   const [confDel, setConfDel] = useState(null);
   const [confDelPr, setConfDelPr] = useState(null);
   const [showImport, setShowImport] = useState(false);
-  const [sq, setSq] = useState("");
   const [ntf, setNtf] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mobNav, setMobNav] = useState(false);
   const notify = (m, t = "success") => { setNtf({ m, t }); setTimeout(() => setNtf(null), 3000); };
 
-  // Responsive: detect screen size tiers
+  // Responsive: detect screen size tiers + dynamic scaling
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
+  const [uiScale, setUiScale] = useState(1);
   useEffect(() => {
     const check = () => {
       const w = window.innerWidth;
       setIsMobile(w < 768);
       setIsTablet(w >= 768 && w < 1024);
       setIsCompact(w < 1024);
+      // Dynamic scaling: 1440px→1.0x, 1920px→2.5x, capped 3.0x
+      const scale = w >= 1440 ? Math.min(3.0, 1 + (w - 1440) * 0.003125) : 1;
+      setUiScale(scale);
     };
     check();
     window.addEventListener("resize", check);
@@ -1803,9 +1812,26 @@ export default function App() {
     const [showCmp, setShowCmp] = useState(false);
     const [collDay, setCollDay] = useState({});
 
-    const syncBlock2 = (np) => {
+    // Smart sync: only syncs STRUCTURE (add/remove/reorder exercises) to block2,
+    // preserving any manual edits the user made to block2 fields.
+    const syncBlock2Structure = (np) => {
       if (!np.block1) return np;
-      np.block2 = np.block1.map(day => ({ ...day, exercises: microProgress(day.exercises, np.level || "intermediate") }));
+      if (!np.block2) {
+        np.block2 = np.block1.map(day => ({ ...day, exercises: microProgress(day.exercises, np.level || "intermediate") }));
+        return np;
+      }
+      np.block2 = np.block1.map((day, di) => {
+        const oldDay = (np.block2[di] || {});
+        const oldExs = oldDay.exercises || [];
+        const newExs = day.exercises.map((b1ex, ei) => {
+          const oldEx = oldExs[ei];
+          if (oldEx && oldEx.id === b1ex.id) {
+            return { ...oldEx, section: b1ex.section, ssGroup: b1ex.ssGroup, circuit: b1ex.circuit };
+          }
+          return microProgress([b1ex], np.level || "intermediate")[0];
+        });
+        return { ...day, exercises: newExs };
+      });
       return np;
     };
     const upEx = (bk, di, ei, fld, val) => {
@@ -1813,17 +1839,13 @@ export default function App() {
       setP(np);
     };
     const rmEx = (di, ei) => {
-      const np = { ...p };
-      np.block1 = [...np.block1]; np.block1[di] = { ...np.block1[di] }; np.block1[di].exercises = np.block1[di].exercises.filter((_, i) => i !== ei);
-      if (np.block2 && np.block2[di]) { np.block2 = [...np.block2]; np.block2[di] = { ...np.block2[di] }; np.block2[di].exercises = np.block2[di].exercises.filter((_, i) => i !== ei); }
-      setP(np);
+      const np = { ...p }; np.block1 = [...np.block1]; np.block1[di] = { ...np.block1[di] }; np.block1[di].exercises = np.block1[di].exercises.filter((_, i) => i !== ei);
+      syncBlock2Structure(np); setP(np);
     };
     const repEx = (di, ei, nx) => {
-      const np = { ...p };
-      np.block1 = [...np.block1]; np.block1[di] = { ...np.block1[di] }; np.block1[di].exercises = [...np.block1[di].exercises];
+      const np = { ...p }; np.block1 = [...np.block1]; np.block1[di] = { ...np.block1[di] }; np.block1[di].exercises = [...np.block1[di].exercises];
       const o = np.block1[di].exercises[ei]; np.block1[di].exercises[ei] = { ...nx, section: o.section, sets: o.sets, reps: o.reps, rest: o.rest, weight: o.weight, rpe: o.rpe, notes: o.notes || "", ssGroup: o.ssGroup };
-      if (np.block2 && np.block2[di] && np.block2[di].exercises[ei]) { np.block2 = [...np.block2]; np.block2[di] = { ...np.block2[di] }; np.block2[di].exercises = [...np.block2[di].exercises]; const o2 = np.block2[di].exercises[ei]; np.block2[di].exercises[ei] = { ...nx, section: o2.section, sets: o2.sets, reps: o2.reps, rest: o2.rest, weight: o2.weight, rpe: o2.rpe, notes: o2.notes || "", ssGroup: o2.ssGroup }; }
-      setP(np); setExPk(null);
+      syncBlock2Structure(np); setP(np); setExPk(null);
     };
 
     // Superset toggle: link exercise with the one below it
@@ -1834,18 +1856,16 @@ export default function App() {
       if (ei >= exs.length - 1) return; // can't SS last exercise
       const next = exs[ei + 1];
       if (ex.ssGroup && ex.ssGroup === next.ssGroup) {
+        // Remove superset grouping
         const gid = ex.ssGroup;
         exs.forEach((e, i) => { if (e.ssGroup === gid) { exs[i] = { ...e }; delete exs[i].ssGroup; } });
-        // Mirror to block2
-        if (np.block2 && np.block2[di]) { np.block2 = [...np.block2]; np.block2[di] = { ...np.block2[di] }; np.block2[di].exercises = [...np.block2[di].exercises]; np.block2[di].exercises.forEach((e, i) => { if (e.ssGroup === gid) { np.block2[di].exercises[i] = { ...e }; delete np.block2[di].exercises[i].ssGroup; } }); }
       } else {
+        // Create/extend superset group
         const gid = ex.ssGroup || next.ssGroup || ("ss_" + di + "_" + ei);
         exs[ei] = { ...ex, ssGroup: gid };
         exs[ei + 1] = { ...next, ssGroup: gid };
-        // Mirror to block2
-        if (np.block2 && np.block2[di] && np.block2[di].exercises[ei + 1]) { np.block2 = [...np.block2]; np.block2[di] = { ...np.block2[di] }; np.block2[di].exercises = [...np.block2[di].exercises]; np.block2[di].exercises[ei] = { ...np.block2[di].exercises[ei], ssGroup: gid }; np.block2[di].exercises[ei + 1] = { ...np.block2[di].exercises[ei + 1], ssGroup: gid }; }
       }
-      setP(np);
+      syncBlock2Structure(np); setP(np);
     };
 
     const sc = s => ({ "Warm-Up": "#6eb5ff", Strength: K.ac, Core: "#b388ff", Finisher: K.dg }[s] || K.tm);
@@ -1876,11 +1896,11 @@ export default function App() {
 
     // Inline fields component for one block
     const ExFields = ({ bk, di, ei, ex }) => (
-      <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
         {["sets","reps","weight","rpe"].map(fld => (
           <input key={fld} value={ex[fld] || ""} onChange={e => upEx(bk, di, ei, fld, e.target.value)}
-            placeholder={fld} title={fld}
-            style={{ width: fld === "weight" ? 56 : fld === "reps" ? 50 : 38, padding: "6px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 12, fontFamily: mf, textAlign: "center", outline: "none", minHeight: 32 }} />
+            placeholder={fld.charAt(0).toUpperCase() + fld.slice(1)} title={fld}
+            style={{ width: fld === "weight" ? 52 : fld === "reps" ? 44 : 32, padding: "6px 3px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none", minHeight: 30 }} />
         ))}
       </div>
     );
@@ -1907,8 +1927,8 @@ export default function App() {
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <div><span style={{ fontSize: 8, color: K.td }}>W1-2</span>{ex1 && <ExFields bk="block1" di={di} ei={ei} ex={ex1} />}</div>
-              <div><span style={{ fontSize: 8, color: K.td }}>W3-4</span>{ex2 && <ExFields bk="block2" di={di} ei={ei} ex={ex2} />}</div>
+              <div><span style={{ fontSize: 8, color: K.td }}>W1-2</span>{ex1 && ExFields({ bk: "block1", di, ei, ex: ex1 })}</div>
+              <div><span style={{ fontSize: 8, color: K.td }}>W3-4</span>{ex2 && ExFields({ bk: "block2", di, ei, ex: ex2 })}</div>
             </div>
             <div style={{ display: "flex", gap: 6, marginTop: 6, alignItems: "center", flexWrap: "wrap" }}>
               <input value={ex1?.notes || ""} onChange={e => upEx("block1", di, ei, "notes", e.target.value)} placeholder="Notes..." style={{ padding: "3px 8px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 80 }} />
@@ -1918,22 +1938,24 @@ export default function App() {
         );
       }
 
-      // DESKTOP: original single-row grid — name | W1-2 | W3-4 | SS | trash
+      // DESKTOP: single-row grid — name | W1-2 fields + notes | W3-4 fields + notes | SS | trash
       return (
         <div style={{ background: K.cd, border: "1px solid " + K.bd, borderRadius: ssRadius, marginBottom: ssMargin, padding: "8px 12px", ...ssStyle }}>
           {isSSStart && <div style={{ fontSize: 9, fontWeight: 700, color: "#f0a030", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Superset</div>}
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(100px,280px) 1fr 1fr 28px 28px", gap: 6, alignItems: "center" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(120px, 1.2fr) minmax(200px, 1fr) minmax(200px, 1fr) 28px 28px", gap: 8, alignItems: "center" }}>
             <div style={{ color: K.tx, fontWeight: 500, fontSize: 13, cursor: "pointer", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} onClick={() => setExPk({ di, sec: ex.section, idx: ei, rep: true })}>
               {ex.name}{ex.circuit && <span style={{ fontSize: 10, color: K.td, marginLeft: 4 }}>({ex.circuit.join(", ")})</span>}
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 8, color: K.td, textAlign: "center" }}>W1-2</span>{ex1 && <ExFields bk="block1" di={di} ei={ei} ex={ex1} />}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 8, color: K.td, textAlign: "center" }}>W3-4</span>{ex2 && <ExFields bk="block2" di={di} ei={ei} ex={ex2} />}</div>
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>{ex1 && ExFields({ bk: "block1", di, ei, ex: ex1 })}<input value={ex1?.notes || ""} onChange={e => upEx("block1", di, ei, "notes", e.target.value)} placeholder="Notes" style={{ padding: "6px 6px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 40, minHeight: 30 }} /></div>
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>{ex2 && ExFields({ bk: "block2", di, ei, ex: ex2 })}<input value={ex2?.notes || ""} onChange={e => upEx("block2", di, ei, "notes", e.target.value)} placeholder="Notes" style={{ padding: "6px 6px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 40, minHeight: 30 }} /></div>
             <button onClick={() => toggleSS(di, ei)} title="Toggle Superset" style={{ background: "none", border: "none", color: ex.ssGroup ? "#f0a030" : K.td, cursor: "pointer", padding: 2, opacity: 0.7, fontSize: 14 }}>SS</button>
             <button onClick={() => rmEx(di, ei)} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 2, opacity: 0.5 }}>{I.trash}</button>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 6, marginTop: 4, alignItems: "center" }}>
-            <input value={ex1?.notes || ""} onChange={e => upEx("block1", di, ei, "notes", e.target.value)} placeholder="Notes..." style={{ padding: "3px 8px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1 }} />
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(120px, 1.2fr) minmax(200px, 1fr) minmax(200px, 1fr) 28px 28px", gap: 8, marginTop: 4, alignItems: "center" }}>
+            <div></div>
             <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={ex1?.rest || ""} onChange={e => upEx("block1", di, ei, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={ex2?.rest || ""} onChange={e => upEx("block2", di, ei, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>
+            <div></div><div></div>
           </div>
         </div>
       );
@@ -1988,10 +2010,10 @@ export default function App() {
 
                   {!isCollapsed && <div style={{ border: "1px solid " + K.bd, borderTop: "none", borderRadius: "0 0 10px 10px", padding: isMobile ? 8 : 12 }}>
                     {/* Column headers - wide desktop only */}
-                    {!isCompact && <div style={{ display: "grid", gridTemplateColumns: "minmax(100px,280px) 1fr 1fr 28px 28px", gap: 6, padding: "0 12px 6px", borderBottom: "1px solid " + K.bd, marginBottom: 8 }}>
+                    {!isCompact && <div style={{ display: "grid", gridTemplateColumns: "minmax(120px, 1.2fr) minmax(200px, 1fr) minmax(200px, 1fr) 28px 28px", gap: 8, padding: "0 12px 6px", borderBottom: "1px solid " + K.bd, marginBottom: 8 }}>
                       <span style={{ fontSize: 10, color: K.td, fontWeight: 600 }}>EXERCISE</span>
-                      <span style={{ fontSize: 10, color: K.td, fontWeight: 600, textAlign: "center" }}>BLOCK 1 (W1-2)</span>
-                      <span style={{ fontSize: 10, color: K.td, fontWeight: 600, textAlign: "center" }}>BLOCK 2 (W3-4)</span>
+                      <span style={{ fontSize: 10, color: K.td, fontWeight: 600 }}>BLOCK 1 (W1-2)</span>
+                      <span style={{ fontSize: 10, color: K.td, fontWeight: 600 }}>BLOCK 2 (W3-4)</span>
                       <span></span><span></span>
                     </div>}
 
@@ -2009,7 +2031,7 @@ export default function App() {
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 3, height: 14, borderRadius: 2, background: sc(ex1.section) }} /><span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: sc(ex1.section) }}>{ex1.section}</span></div>
                           <Btn v="ghost" sm onClick={() => setExPk({ di, sec: ex1.section })} icon={I.plus}>Add</Btn>
                         </div>}
-                        <ExRow di={di} ei={ei} ex1={ex1} ex2={ex2} isSSStart={isSSStart} isSSMid={isSSMid} isSSEnd={isSSEnd} />
+                        {ExRow({ di, ei, ex1, ex2, isSSStart, isSSMid, isSSEnd })}
                       </div>);
                     }); })()}
                   </div>}
@@ -2049,7 +2071,7 @@ export default function App() {
           </div>
         </div>
 
-        {exPk && <ExPick section={exPk.sec} dayType={(p.block1[exPk.di] || {}).dayType} location={p.trainingLocation || "gym"} onSelect={ex => { if (exPk.rep && exPk.idx != null) { repEx(exPk.di, exPk.idx, ex); } else { const np = { ...p }; np.block1 = [...np.block1]; np.block1[exPk.di] = { ...np.block1[exPk.di] }; const exs = [...np.block1[exPk.di].exercises]; const ic = ex.category === "compound"; const lc = p.levelCfg || {}; const ne = { ...ex, section: exPk.sec, sets: ic ? (lc.compoundSets || lc.cSets || 4) : (lc.accessorySets || lc.aSets || 3), reps: ic ? (lc.compoundReps || lc.cReps || "8") : (lc.accessoryReps || lc.aReps || "10"), rest: ic ? (lc.restCompound || lc.rest || 120) : (lc.restAccessory || lc.aRest || 90), weight: "—", rpe: ic ? (lc.compoundRPE || lc.cRPE || "") : (lc.accessoryRPE || lc.aRPE || ""), notes: "" }; let ia = exs.length; for (let i = exs.length - 1; i >= 0; i--) { if (exs[i].section === exPk.sec) { ia = i + 1; break; } } exs.splice(ia, 0, ne); np.block1[exPk.di].exercises = exs; if (np.block2 && np.block2[exPk.di]) { np.block2 = [...np.block2]; np.block2[exPk.di] = { ...np.block2[exPk.di] }; const exs2 = [...np.block2[exPk.di].exercises]; exs2.splice(ia, 0, { ...ne }); np.block2[exPk.di].exercises = exs2; } setP(np); setExPk(null); } }} onClose={() => setExPk(null)} />}
+        {exPk && <ExPick section={exPk.sec} dayType={(p.block1[exPk.di] || {}).dayType} location={p.trainingLocation || "gym"} onSelect={ex => { if (exPk.rep && exPk.idx != null) { repEx(exPk.di, exPk.idx, ex); } else { const np = { ...p }; np.block1 = [...np.block1]; np.block1[exPk.di] = { ...np.block1[exPk.di] }; const exs = [...np.block1[exPk.di].exercises]; const ic = ex.category === "compound"; const lc = p.levelCfg || {}; const ne = { ...ex, section: exPk.sec, sets: ic ? (lc.compoundSets || lc.cSets || 4) : (lc.accessorySets || lc.aSets || 3), reps: ic ? (lc.compoundReps || lc.cReps || "8") : (lc.accessoryReps || lc.aReps || "10"), rest: ic ? (lc.restCompound || lc.rest || 120) : (lc.restAccessory || lc.aRest || 90), weight: "—", rpe: ic ? (lc.compoundRPE || lc.cRPE || "") : (lc.accessoryRPE || lc.aRPE || ""), notes: "" }; let ia = exs.length; for (let i = exs.length - 1; i >= 0; i--) { if (exs[i].section === exPk.sec) { ia = i + 1; break; } } exs.splice(ia, 0, ne); np.block1[exPk.di].exercises = exs; syncBlock2Structure(np); setP(np); setExPk(null); } }} onClose={() => setExPk(null)} />}
       </div>
     );
   }
@@ -2113,6 +2135,7 @@ export default function App() {
 
   function Clients() {
     const [histCl, setHistCl] = useState(null);
+    const [sq, setSq] = useState("");
     const fl = cls.filter(c => c.name.toLowerCase().includes(sq.toLowerCase()) || c.level.includes(sq.toLowerCase()));
     if (selCl && selPr) { const allPr = getAll(prgs, selCl.id); const prIdx = allPr.findIndex(x => x.id === selPr.id); const prevPr = prIdx > 0 ? allPr[prIdx - 1] : null; return <ProgEdit program={selPr} prevProgram={prevPr} onSave={u => { setPrgs(updProg(prgs, u.clientId, u)); setSelPr(u); dbSave("programs", prToDb(u)).catch(console.error); }} onBack={() => setSelPr(null)} />; }
     if (selCl && histCl) return <ProgHistory client={selCl} programs={getAll(prgs, selCl.id)} onSelectProgram={p => { setSelPr(p); setHistCl(null); }} onBack={() => setHistCl(null)} />;
@@ -2173,12 +2196,12 @@ export default function App() {
     </div>
   );
   return (
-    <div className="tf-root" style={{ display: "flex", flexDirection: isMobile ? "column" : "row", minHeight: "100vh", background: K.bg, fontFamily: ff, color: K.tx, WebkitTextSizeAdjust: "100%" }}>
+    <div className="tf-root" style={{ display: "flex", flexDirection: isMobile ? "column" : "row", minHeight: uiScale > 1 ? (100 / uiScale) + "vh" : "100vh", background: K.bg, fontFamily: ff, color: K.tx, WebkitTextSizeAdjust: "100%", zoom: uiScale > 1 ? uiScale : undefined }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
       <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 
       {/* Desktop sidebar */}
-      {!isMobile && <nav style={{ width: 220, minHeight: "100vh", background: K.sf, borderRight: "1px solid " + K.bd, padding: "20px 0", display: "flex", flexDirection: "column", flexShrink: 0 }}>
+      {!isMobile && <nav style={{ width: 220, minHeight: uiScale > 1 ? (100 / uiScale) + "vh" : "100vh", background: K.sf, borderRight: "1px solid " + K.bd, padding: "20px 0", display: "flex", flexDirection: "column", flexShrink: 0 }}>
         <div style={{ padding: "0 20px 24px", borderBottom: "1px solid " + K.bd, marginBottom: 16 }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ width: 32, height: 32, borderRadius: 8, background: K.ac, display: "flex", alignItems: "center", justifyContent: "center", color: "#0a0a0c" }}>{I.bolt}</div><div><div style={{ fontWeight: 700, fontSize: 15, color: K.tx, letterSpacing: "-0.02em" }}>TrainForge</div><div style={{ fontSize: 10, color: K.td, textTransform: "uppercase", letterSpacing: "0.08em" }}>Pro Dashboard</div></div></div></div>
         {nav.map(n => <button key={n.id} onClick={() => { setPg(n.id); setSelCl(null); setSelPr(null); }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 20px", border: "none", background: pg === n.id ? K.ab : "transparent", color: pg === n.id ? K.ac : K.tm, fontFamily: ff, fontSize: 13, fontWeight: 600, cursor: "pointer", borderLeft: pg === n.id ? "2px solid " + K.ac : "2px solid transparent", width: "100%", textAlign: "left" }}>{n.icon}{n.label}</button>)}
       </nav>}
@@ -2191,7 +2214,7 @@ export default function App() {
         </div>
       </div>}
 
-      <main style={{ flex: 1, padding: isMobile ? "16px 12px 90px" : isTablet ? "20px 20px" : "28px 36px", overflowY: "auto", maxHeight: isMobile ? undefined : "100vh" }}>{pg === "dashboard" && <Dash />}{pg === "clients" && <Clients />}{pg === "programs" && <Programs />}{pg === "library" && <Library />}</main>
+      <main style={{ flex: 1, padding: isMobile ? "16px 12px 90px" : isTablet ? "20px 20px" : "28px 36px", overflowY: "auto", maxHeight: isMobile ? undefined : uiScale > 1 ? (100 / uiScale) + "vh" : "100vh" }}>{pg === "dashboard" && <Dash />}{pg === "clients" && <Clients />}{pg === "programs" && <Programs />}{pg === "library" && <Library />}</main>
 
       {/* Mobile bottom tab bar */}
       {isMobile && <nav className="tf-bottom-nav" style={{ position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: K.sf, borderTop: "1px solid " + K.bd, zIndex: 50, paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
@@ -2206,6 +2229,7 @@ export default function App() {
         @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
         *{box-sizing:border-box}
         ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:${K.bg}}::-webkit-scrollbar-thumb{background:${K.bd};border-radius:3px}
+        ::-webkit-scrollbar-thumb:hover{background:${K.tm}}
         select option{background:${K.sf};color:${K.tx}}
         input:focus,select:focus,textarea:focus{border-color:${K.ac}!important}
         
