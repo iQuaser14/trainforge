@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -90,6 +90,7 @@ const EXERCISES = {
     { id: "aps23", name: "DB Bridged Floor Press", category: "accessory", equipment: "dumbbells", muscles: ["chest", "glutes"], focus: "A" },
     { id: "aps24", name: "Dip su Sedia", category: "accessory", equipment: "chair", muscles: ["triceps"], focus: "A" },
     { id: "aps25", name: "SL Goblet Squat (Chair)", category: "accessory", equipment: "dumbbell/chair", muscles: ["quads", "glutes"], focus: "A" },
+    { id: "aps26", name: "French Press", category: "accessory", equipment: "barbell/dumbbells", muscles: ["triceps"], focus: "A" },
   ],
   accessory_pull_hinge: [
     { id: "aph1", name: "Hip Thrust", category: "accessory", equipment: "barbell", muscles: ["glutes"], focus: "B" },
@@ -118,6 +119,7 @@ const EXERCISES = {
     { id: "aph24", name: "Plank Row (Chair)", category: "accessory", equipment: "dumbbell/chair", muscles: ["back"], focus: "B" },
     { id: "aph25", name: "Bicep Curls DB", category: "accessory", equipment: "dumbbells", muscles: ["biceps"], focus: "B" },
     { id: "aph26", name: "DB Tricep Extension", category: "accessory", equipment: "dumbbells", muscles: ["triceps"], focus: "B" },
+    { id: "aph27", name: "Rear Delt Fly", category: "accessory", equipment: "dumbbells", muscles: ["rear delts", "upper back"], focus: "B" },
   ],
   core: [
     { id: "co1", name: "Plank", category: "core", equipment: "none" },
@@ -136,6 +138,10 @@ const EXERCISES = {
     { id: "co14", name: "Plank Drag Through", category: "core", equipment: "dumbbell" },
     { id: "co15", name: "Plank Reach", category: "core", equipment: "none" },
     { id: "co16", name: "Reverse Crunch", category: "core", equipment: "none" },
+    { id: "co17", name: "Windmill (KB)", category: "core", equipment: "kettlebell" },
+    { id: "co18", name: "Kneeling Halo", category: "core", equipment: "kettlebell" },
+    { id: "co19", name: "Stir The Pot Fitball", category: "core", equipment: "fitball" },
+    { id: "co20", name: "Plank Side Fitball", category: "core", equipment: "fitball" },
   ],
   hiit: [
     { id: "h1", name: "Burpees", category: "hiit", equipment: "none" },
@@ -1550,7 +1556,6 @@ export default function App() {
   const [ntf, setNtf] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mobNav, setMobNav] = useState(false);
-  const progEditCache = useRef({});
   const notify = (m, t = "success") => { setNtf({ m, t }); setTimeout(() => setNtf(null), 3000); };
 
   // Responsive: detect screen size tiers + dynamic scaling
@@ -1801,27 +1806,14 @@ export default function App() {
     } catch (err) { console.error("PDF error:", err); notify("PDF error: " + err.message, "warn"); }
   };
 
-  function ProgEdit({ program, prevProgram, onSave, onPersist, onBack }) {
-    // Initialize from cache ref (survives remounts) or from prop
-    const [p, setP] = useState(() => {
-      return progEditCache.current[program.id] || JSON.parse(JSON.stringify(program));
-    });
+  function ProgEdit({ program, prevProgram, onSave, onBack }) {
+    const [p, setP] = useState(JSON.parse(JSON.stringify(program)));
     const [exPk, setExPk] = useState(null);
     const [showCmp, setShowCmp] = useState(false);
     const [collDay, setCollDay] = useState({});
 
-    // Keep cache ref in sync on every edit
-    useEffect(() => { progEditCache.current[program.id] = p; }, [p]);
-
-    // Auto-save: debounced — only writes to DB, does NOT update parent state
-    const isInitial = useRef(true);
-    useEffect(() => {
-      if (isInitial.current) { isInitial.current = false; return; }
-      const timer = setTimeout(() => onPersist(p), 800);
-      return () => clearTimeout(timer);
-    }, [p]);
-
-    // Smart sync: only syncs STRUCTURE to block2, preserving manual edits
+    // Smart sync: only syncs STRUCTURE (add/remove/reorder exercises) to block2,
+    // preserving any manual edits the user made to block2 fields.
     const syncBlock2Structure = (np) => {
       if (!np.block1) return np;
       if (!np.block2) {
@@ -1974,7 +1966,7 @@ export default function App() {
       <div>
         {/* Header */}
         <div className="tf-prog-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, position: "sticky", top: isMobile ? 53 : 0, zIndex: 10, background: K.bg, padding: "12px 0", gap: 8, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}><button onClick={() => { onSave(p); onBack(); }} style={{ background: "none", border: "none", color: K.tm, cursor: "pointer", padding: 4, flexShrink: 0 }}>{I.back}</button><div style={{ minWidth: 0 }}><h2 style={{ margin: 0, fontSize: isMobile ? 16 : 20, color: K.tx, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.clientName}</h2><div style={{ fontSize: 11, color: K.tm, display: "flex", gap: 6, alignItems: "center", marginTop: 4, flexWrap: "wrap" }}>Mo.{p.monthNumber} · <LvlBadge level={p.level} /><span>{p.sessionsPerWeek}×/wk</span><span>{p.sessionDuration}min</span>{p.trainingLocation === "home" && <span style={{ padding: "2px 6px", borderRadius: 4, fontSize: 9, fontWeight: 600, background: "rgba(200,255,46,0.15)", color: K.ac }}>🏠</span>}</div></div></div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}><button onClick={onBack} style={{ background: "none", border: "none", color: K.tm, cursor: "pointer", padding: 4, flexShrink: 0 }}>{I.back}</button><div style={{ minWidth: 0 }}><h2 style={{ margin: 0, fontSize: isMobile ? 16 : 20, color: K.tx, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.clientName}</h2><div style={{ fontSize: 11, color: K.tm, display: "flex", gap: 6, alignItems: "center", marginTop: 4, flexWrap: "wrap" }}>Mo.{p.monthNumber} · <LvlBadge level={p.level} /><span>{p.sessionsPerWeek}×/wk</span><span>{p.sessionDuration}min</span>{p.trainingLocation === "home" && <span style={{ padding: "2px 6px", borderRadius: 4, fontSize: 9, fontWeight: 600, background: "rgba(200,255,46,0.15)", color: K.ac }}>🏠</span>}</div></div></div>
           <div className="tf-prog-btns" style={{ display: "flex", gap: 6, flexWrap: "wrap", flexShrink: 0 }}>{prevProgram && <Btn v={showCmp ? "primary" : "secondary"} sm onClick={() => setShowCmp(!showCmp)} icon={I.history}>{showCmp ? "Hide" : "Cmp"}</Btn>}<Btn v="secondary" sm onClick={() => exportPDF(p)} icon={pdfIcon}>PDF</Btn><Btn v="secondary" sm onClick={() => { setP(JSON.parse(JSON.stringify(program))); notify("Reset", "warn"); }} icon={I.refresh}>Reset</Btn><Btn v="danger" sm onClick={() => setConfDelPr(p)} icon={I.trash}>Del</Btn><Btn sm onClick={() => { onSave(p); notify("Saved!"); }}>Save</Btn></div>
         </div>
 
@@ -2145,7 +2137,7 @@ export default function App() {
     const [histCl, setHistCl] = useState(null);
     const [sq, setSq] = useState("");
     const fl = cls.filter(c => c.name.toLowerCase().includes(sq.toLowerCase()) || c.level.includes(sq.toLowerCase()));
-    if (selCl && selPr) { const allPr = getAll(prgs, selCl.id); const prIdx = allPr.findIndex(x => x.id === selPr.id); const prevPr = prIdx > 0 ? allPr[prIdx - 1] : null; return <ProgEdit program={selPr} prevProgram={prevPr} onPersist={u => { dbSave("programs", prToDb(u)).catch(console.error); }} onSave={u => { setPrgs(updProg(prgs, u.clientId, u)); setSelPr(u); dbSave("programs", prToDb(u)).catch(console.error); }} onBack={() => setSelPr(null)} />; }
+    if (selCl && selPr) { const allPr = getAll(prgs, selCl.id); const prIdx = allPr.findIndex(x => x.id === selPr.id); const prevPr = prIdx > 0 ? allPr[prIdx - 1] : null; return <ProgEdit program={selPr} prevProgram={prevPr} onSave={u => { setPrgs(updProg(prgs, u.clientId, u)); setSelPr(u); dbSave("programs", prToDb(u)).catch(console.error); }} onBack={() => setSelPr(null)} />; }
     if (selCl && histCl) return <ProgHistory client={selCl} programs={getAll(prgs, selCl.id)} onSelectProgram={p => { setSelPr(p); setHistCl(null); }} onBack={() => setHistCl(null)} />;
     if (selCl) {
       const c = selCl, cp = getLatest(prgs, c.id), allP = getAll(prgs, c.id);
@@ -2181,7 +2173,7 @@ export default function App() {
   }
 
   function Programs() {
-    if (selPr) { const allPr = getAll(prgs, selPr.clientId); const prIdx = allPr.findIndex(x => x.id === selPr.id); const prevPr = prIdx > 0 ? allPr[prIdx - 1] : null; return <ProgEdit program={selPr} prevProgram={prevPr} onPersist={u => { dbSave("programs", prToDb(u)).catch(console.error); }} onSave={u => { setPrgs(updProg(prgs, u.clientId, u)); setSelPr(u); dbSave("programs", prToDb(u)).catch(console.error); }} onBack={() => setSelPr(null)} />; }
+    if (selPr) { const allPr = getAll(prgs, selPr.clientId); const prIdx = allPr.findIndex(x => x.id === selPr.id); const prevPr = prIdx > 0 ? allPr[prIdx - 1] : null; return <ProgEdit program={selPr} prevProgram={prevPr} onSave={u => { setPrgs(updProg(prgs, u.clientId, u)); setSelPr(u); dbSave("programs", prToDb(u)).catch(console.error); }} onBack={() => setSelPr(null)} />; }
     const all = Object.entries(prgs).flatMap(([, arr]) => arr).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     return (<div><div style={{ marginBottom: 24 }}><h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: K.tx }}>Programs</h1><p style={{ margin: "6px 0 0", color: K.tm, fontSize: 14 }}>{all.length} programs</p></div>{all.length === 0 ? <Crd style={{ textAlign: "center", padding: 40 }}><div style={{ color: K.td, fontSize: 14 }}>No programs yet.</div></Crd> : <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>{all.map(p => <Crd key={p.id} onClick={() => setSelPr(p)} style={{ cursor: "pointer" }}><div style={{ fontWeight: 600, color: K.tx, fontSize: 15, marginBottom: 6 }}>{p.clientName}</div><div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}><LvlBadge level={p.level} /><span style={{ fontSize: 12, color: K.tm }}>Mo.{p.monthNumber} · {p.sessionsPerWeek}×/wk · {p.sessionDuration}min</span></div><div style={{ fontSize: 12, color: K.td }}>{p.block1.reduce((a, d) => a + d.exercises.length, 0) + p.block2.reduce((a, d) => a + d.exercises.length, 0)} exercises · {new Date(p.createdAt).toLocaleDateString()}</div></Crd>)}</div>}</div>);
   }
