@@ -1713,16 +1713,21 @@ export default function App() {
 
           const rows = [];
           let lastSection = "";
+          let lastSSGroup = "";
           for (let ei = 0; ei < exs.length; ei++) {
             const ex = exs[ei];
             if (!ex) continue;
 
-            if (ex.section && ex.section !== lastSection && ex.section !== "Warm-Up") {
-              if (lastSection !== "" || ei > 0) {
-                rows.push([{ content: ex.section.toUpperCase(), colSpan: 6, styles: { fillColor: [25, 50, 110], textColor: [130, 200, 255], fontStyle: "bold", fontSize: 7, cellPadding: 1.5 } }]);
-              }
+            if (ex.section && ex.section !== lastSection) {
+              rows.push([{ content: ex.section.toUpperCase(), colSpan: 6, styles: { fillColor: [25, 50, 110], textColor: [130, 200, 255], fontStyle: "bold", fontSize: 7, cellPadding: 1.5 } }]);
               lastSection = ex.section;
-            } else if (ei === 0 && ex.section) { lastSection = ex.section; }
+            }
+
+            // Superset indicator
+            if (ex.ssGroup && ex.ssGroup !== lastSSGroup) {
+              rows.push([{ content: "⚡ SUPERSET", colSpan: 6, styles: { fillColor: [60, 40, 10], textColor: [240, 160, 48], fontStyle: "bold", fontSize: 7, cellPadding: 1.2 } }]);
+            }
+            lastSSGroup = ex.ssGroup || "";
 
             const name = (ex.name || "") + (ex.circuit ? " (" + ex.circuit.join(", ") + ")" : "");
             const sets = (ex.sets !== undefined && ex.sets !== null && ex.sets !== "" && String(ex.sets) !== "undefined" && String(ex.sets) !== "null") ? String(ex.sets) : "";
@@ -1850,6 +1855,10 @@ export default function App() {
       const np = { ...p }; np.block1 = [...np.block1]; np.block1[di] = { ...np.block1[di] }; np.block1[di].exercises = np.block1[di].exercises.filter((_, i) => i !== ei);
       syncBlock2Structure(np); setP(np);
     };
+    const rmSection = (di, sec) => {
+      const np = { ...p }; np.block1 = [...np.block1]; np.block1[di] = { ...np.block1[di] }; np.block1[di].exercises = np.block1[di].exercises.filter(e => e.section !== sec);
+      syncBlock2Structure(np); setP(np);
+    };
     const repEx = (di, ei, nx) => {
       const np = { ...p }; np.block1 = [...np.block1]; np.block1[di] = { ...np.block1[di] }; np.block1[di].exercises = [...np.block1[di].exercises];
       const o = np.block1[di].exercises[ei]; np.block1[di].exercises[ei] = { ...nx, section: o.section, sets: o.sets, reps: o.reps, rest: o.rest, weight: o.weight, rpe: o.rpe, notes: o.notes || "", ssGroup: o.ssGroup };
@@ -1975,7 +1984,7 @@ export default function App() {
         {/* Header */}
         <div className="tf-prog-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, position: "sticky", top: isMobile ? 53 : 0, zIndex: 10, background: K.bg, padding: "12px 0", gap: 8, flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}><button onClick={() => { onSave(p); onBack(); }} style={{ background: "none", border: "none", color: K.tm, cursor: "pointer", padding: 4, flexShrink: 0 }}>{I.back}</button><div style={{ minWidth: 0 }}><h2 style={{ margin: 0, fontSize: isMobile ? 16 : 20, color: K.tx, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.clientName}</h2><div style={{ fontSize: 11, color: K.tm, display: "flex", gap: 6, alignItems: "center", marginTop: 4, flexWrap: "wrap" }}>Mo.{p.monthNumber} · <LvlBadge level={p.level} /><span>{p.sessionsPerWeek}×/wk</span><span>{p.sessionDuration}min</span>{p.trainingLocation === "home" && <span style={{ padding: "2px 6px", borderRadius: 4, fontSize: 9, fontWeight: 600, background: "rgba(200,255,46,0.15)", color: K.ac }}>🏠</span>}</div></div></div>
-          <div className="tf-prog-btns" style={{ display: "flex", gap: 6, flexWrap: "wrap", flexShrink: 0 }}>{prevProgram && <Btn v={showCmp ? "primary" : "secondary"} sm onClick={() => setShowCmp(!showCmp)} icon={I.history}>{showCmp ? "Hide" : "Cmp"}</Btn>}<Btn v="secondary" sm onClick={() => exportPDF(p)} icon={pdfIcon}>PDF</Btn><Btn v="secondary" sm onClick={() => { setP(JSON.parse(JSON.stringify(program))); notify("Reset", "warn"); }} icon={I.refresh}>Reset</Btn><Btn v="danger" sm onClick={() => setConfDelPr(p)} icon={I.trash}>Del</Btn><Btn sm onClick={() => { onSave(p); notify("Saved!"); }}>Save</Btn></div>
+          <div className="tf-prog-btns" style={{ display: "flex", gap: 6, flexWrap: "wrap", flexShrink: 0 }}>{prevProgram && <Btn v={showCmp ? "primary" : "secondary"} sm onClick={() => setShowCmp(!showCmp)} icon={I.history}>{showCmp ? "Hide" : "Cmp"}</Btn>}<Btn v="secondary" sm onClick={() => exportPDF(p)} icon={pdfIcon}>PDF</Btn><Btn v="secondary" sm onClick={() => { setP(JSON.parse(JSON.stringify(program))); notify("Reset", "warn"); }} icon={I.refresh}>Reset</Btn><Btn v="danger" sm onClick={() => setConfDelPr(p)} icon={I.trash}>Del</Btn><Btn sm onClick={() => { onPersist(p); notify("Saved!"); }}>Save</Btn></div>
         </div>
 
         <div style={{ display: "flex", gap: 16, flexDirection: isCompact ? "column" : "row" }}>
@@ -2025,23 +2034,31 @@ export default function App() {
                       <span></span><span></span>
                     </div>}
 
-                    {/* Exercises by section */}
-                    {(() => { let ls = ""; return day.exercises.map((ex1, ei) => {
-                      const ex2 = day2 ? day2.exercises[ei] : null;
-                      const secChanged = ex1.section !== ls; ls = ex1.section;
-                      const exs = day.exercises;
-                      const g = ex1.ssGroup;
-                      const isSSStart = g && (ei === 0 || exs[ei-1].ssGroup !== g);
-                      const isSSEnd = g && (ei === exs.length-1 || exs[ei+1].ssGroup !== g);
-                      const isSSMid = g && !isSSStart && !isSSEnd;
-                      return (<div key={ei}>
-                        {secChanged && <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: ei > 0 ? 16 : 0, marginBottom: 8 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 3, height: 14, borderRadius: 2, background: sc(ex1.section) }} /><span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: sc(ex1.section) }}>{ex1.section}</span></div>
-                          <Btn v="ghost" sm onClick={() => setExPk({ di, sec: ex1.section })} icon={I.plus}>Add</Btn>
-                        </div>}
-                        {ExRow({ di, ei, ex1, ex2, isSSStart, isSSMid, isSSEnd })}
-                      </div>);
-                    }); })()}
+                    {/* Exercises by section — always show all sections */}
+                    {["Warm-Up", "Strength", "Core", "Finisher"].map(sec => {
+                      const secExs = day.exercises.map((ex, ei) => ({ ex, ei })).filter(({ ex }) => ex.section === sec);
+                      return (
+                        <div key={sec} style={{ marginBottom: 12 }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 3, height: 14, borderRadius: 2, background: sc(sec) }} /><span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: sc(sec) }}>{sec}</span><span style={{ fontSize: 10, color: K.td }}>({secExs.length})</span></div>
+                            <div style={{ display: "flex", gap: 4 }}>
+                              {secExs.length > 0 && <Btn v="ghost" sm onClick={() => rmSection(di, sec)} style={{ color: K.dg, fontSize: 10 }}>✕ Remove</Btn>}
+                              <Btn v="ghost" sm onClick={() => setExPk({ di, sec })} icon={I.plus}>Add</Btn>
+                            </div>
+                          </div>
+                          {secExs.length === 0 && <div style={{ padding: "8px 12px", fontSize: 11, color: K.td, fontStyle: "italic", background: K.bg, borderRadius: 6 }}>No {sec.toLowerCase()} exercises</div>}
+                          {secExs.map(({ ex: ex1, ei }) => {
+                            const ex2 = day2 ? day2.exercises[ei] : null;
+                            const exs = day.exercises;
+                            const g = ex1.ssGroup;
+                            const isSSStart = g && (ei === 0 || exs[ei-1].ssGroup !== g);
+                            const isSSEnd = g && (ei === exs.length-1 || exs[ei+1].ssGroup !== g);
+                            const isSSMid = g && !isSSStart && !isSSEnd;
+                            return <div key={ei}>{ExRow({ di, ei, ex1, ex2, isSSStart, isSSMid, isSSEnd })}</div>;
+                          })}
+                        </div>
+                      );
+                    })}
                   </div>}
                 </div>
               );
@@ -2079,7 +2096,7 @@ export default function App() {
           </div>
         </div>
 
-        {exPk && <ExPick section={exPk.sec} dayType={(p.block1[exPk.di] || {}).dayType} location={p.trainingLocation || "gym"} onSelect={ex => { if (exPk.rep && exPk.idx != null) { repEx(exPk.di, exPk.idx, ex); } else { const np = { ...p }; np.block1 = [...np.block1]; np.block1[exPk.di] = { ...np.block1[exPk.di] }; const exs = [...np.block1[exPk.di].exercises]; const ic = ex.category === "compound"; const lc = p.levelCfg || {}; const ne = { ...ex, section: exPk.sec, sets: ic ? (lc.compoundSets || lc.cSets || 4) : (lc.accessorySets || lc.aSets || 3), reps: ic ? (lc.compoundReps || lc.cReps || "8") : (lc.accessoryReps || lc.aReps || "10"), rest: ic ? (lc.restCompound || lc.rest || 120) : (lc.restAccessory || lc.aRest || 90), weight: "—", rpe: ic ? (lc.compoundRPE || lc.cRPE || "") : (lc.accessoryRPE || lc.aRPE || ""), notes: "" }; let ia = exs.length; for (let i = exs.length - 1; i >= 0; i--) { if (exs[i].section === exPk.sec) { ia = i + 1; break; } } exs.splice(ia, 0, ne); np.block1[exPk.di].exercises = exs; syncBlock2Structure(np); setP(np); setExPk(null); } }} onClose={() => setExPk(null)} />}
+        {exPk && <ExPick section={exPk.sec} dayType={(p.block1[exPk.di] || {}).dayType} location={p.trainingLocation || "gym"} onSelect={ex => { if (exPk.rep && exPk.idx != null) { repEx(exPk.di, exPk.idx, ex); } else { const np = { ...p }; np.block1 = [...np.block1]; np.block1[exPk.di] = { ...np.block1[exPk.di] }; const exs = [...np.block1[exPk.di].exercises]; const ic = ex.category === "compound"; const lc = p.levelCfg || {}; const ne = { ...ex, section: exPk.sec, sets: ic ? (lc.compoundSets || lc.cSets || 4) : (lc.accessorySets || lc.aSets || 3), reps: ic ? (lc.compoundReps || lc.cReps || "8") : (lc.accessoryReps || lc.aReps || "10"), rest: ic ? (lc.restCompound || lc.rest || 120) : (lc.restAccessory || lc.aRest || 90), weight: "—", rpe: ic ? (lc.compoundRPE || lc.cRPE || "") : (lc.accessoryRPE || lc.aRPE || ""), notes: "" }; const secOrder = ["Warm-Up", "Strength", "Core", "Finisher"]; const secIdx = secOrder.indexOf(exPk.sec); let ia = -1; for (let i = exs.length - 1; i >= 0; i--) { if (exs[i].section === exPk.sec) { ia = i + 1; break; } } if (ia === -1) { ia = exs.length; for (let s = secIdx + 1; s < secOrder.length; s++) { const fi = exs.findIndex(e => e.section === secOrder[s]); if (fi !== -1) { ia = fi; break; } } } exs.splice(ia, 0, ne); np.block1[exPk.di].exercises = exs; syncBlock2Structure(np); setP(np); setExPk(null); } }} onClose={() => setExPk(null)} />}
       </div>
     );
   }
