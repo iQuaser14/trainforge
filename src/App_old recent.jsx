@@ -1713,18 +1713,36 @@ export default function App() {
 
           const rows = [];
           let lastSection = "";
+          let lastSSGroup = "";
+          let ssLetter = 64; // ASCII before 'A', will increment to 'A' for first SS
+          let ssIndex = 0;
           for (let ei = 0; ei < exs.length; ei++) {
             const ex = exs[ei];
             if (!ex) continue;
 
-            if (ex.section && ex.section !== lastSection && ex.section !== "Warm-Up") {
-              if (lastSection !== "" || ei > 0) {
-                rows.push([{ content: ex.section.toUpperCase(), colSpan: 6, styles: { fillColor: [25, 50, 110], textColor: [130, 200, 255], fontStyle: "bold", fontSize: 7, cellPadding: 1.5 } }]);
-              }
+            // Section headers
+            if (ex.section && ex.section !== lastSection) {
+              rows.push([{ content: ex.section.toUpperCase(), colSpan: 6, styles: { fillColor: [25, 50, 110], textColor: [130, 200, 255], fontStyle: "bold", fontSize: 7, cellPadding: 1.5 } }]);
               lastSection = ex.section;
-            } else if (ei === 0 && ex.section) { lastSection = ex.section; }
+            }
 
-            const name = (ex.name || "") + (ex.circuit ? " (" + ex.circuit.join(", ") + ")" : "");
+            // Superset grouping
+            if (ex.ssGroup) {
+              if (ex.ssGroup !== lastSSGroup) {
+                // New superset group
+                ssLetter++;
+                ssIndex = 1;
+                lastSSGroup = ex.ssGroup;
+                rows.push([{ content: "SUPERSET " + String.fromCharCode(ssLetter), colSpan: 6, styles: { fillColor: [50, 35, 8], textColor: [240, 160, 48], fontStyle: "bold", fontSize: 7, cellPadding: 1.2 } }]);
+              } else {
+                ssIndex++;
+              }
+            } else {
+              lastSSGroup = "";
+            }
+
+            const prefix = ex.ssGroup ? String.fromCharCode(ssLetter) + ssIndex + ") " : "";
+            const name = prefix + (ex.name || "") + (ex.circuit ? " (" + ex.circuit.join(", ") + ")" : "");
             const sets = (ex.sets !== undefined && ex.sets !== null && ex.sets !== "" && String(ex.sets) !== "undefined" && String(ex.sets) !== "null") ? String(ex.sets) : "";
             const reps = (ex.reps !== undefined && ex.reps !== null && ex.reps !== "" && String(ex.reps) !== "undefined" && String(ex.reps) !== "null") ? String(ex.reps) : "";
             const weight = ex.weight || "—";
