@@ -1974,9 +1974,10 @@ export default function App() {
     );
 
     // Render one exercise row with both blocks side by side
-    const ExRow = ({ di, ei, ex1, ex2, isSSStart, isSSMid, isSSEnd, bk }) => {
+    const ExRow = ({ di, ei, ei2, ex1, ex2, isSSStart, isSSMid, isSSEnd, bk }) => {
       const ex = ex1 || ex2;
       const targetBk = bk || "block1";
+      const b2i = ei2 != null && ei2 >= 0 ? ei2 : ei; // block2 index, fallback to ei
       const ssStyle = (isSSStart || isSSMid || isSSEnd) ? { borderLeft: "3px solid #f0a030", marginLeft: 0, paddingLeft: 8 } : {};
       const ssRadius = isSSStart ? "10px 10px 0 0" : isSSEnd ? "0 0 10px 10px" : (isSSMid ? "0" : "10px");
       const ssMargin = (isSSMid || isSSEnd) ? 0 : 6;
@@ -1999,12 +2000,18 @@ export default function App() {
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {ex1 && <div>{!bk && <span style={{ fontSize: 8, color: K.td }}>W1-2</span>}{ExFields({ bk: bk || "block1", di, ei, ex: ex1 })}</div>}
-              {!bk && ex2 && <div><span style={{ fontSize: 8, color: K.td }}>W3-4</span>{ExFields({ bk: "block2", di, ei, ex: ex2 })}</div>}
+              {!bk && ex2 && <div><span style={{ fontSize: 8, color: K.td }}>W3-4</span>{ExFields({ bk: "block2", di, ei: b2i, ex: ex2 })}</div>}
             </div>
             <div style={{ display: "flex", gap: 6, marginTop: 6, alignItems: "center", flexWrap: "wrap" }}>
+              {!bk && <span style={{ fontSize: 8, color: K.td, flexBasis: "100%" }}>W1-2</span>}
               <input value={(ex1 || ex)?.notes || ""} onChange={e => upEx(bk || "block1", di, ei, "notes", e.target.value)} placeholder="Notes..." style={{ padding: "3px 8px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 80 }} />
               <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={(ex1 || ex)?.rest || ""} onChange={e => upEx(bk || "block1", di, ei, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>
             </div>
+            {!bk && ex2 && <div style={{ display: "flex", gap: 6, marginTop: 4, alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ fontSize: 8, color: K.td, flexBasis: "100%" }}>W3-4</span>
+              <input value={ex2?.notes || ""} onChange={e => upEx("block2", di, b2i, "notes", e.target.value)} placeholder="Notes..." style={{ padding: "3px 8px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 80 }} />
+              <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={ex2?.rest || ""} onChange={e => upEx("block2", di, b2i, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>
+            </div>}
           </div>
         );
       }
@@ -2018,14 +2025,14 @@ export default function App() {
               {ex.name}{ex.circuit && <span style={{ fontSize: 10, color: K.td, marginLeft: 4 }}>({ex.circuit.join(", ")})</span>}
             </div>
             {ex1 && <div style={{ display: "flex", gap: 4, alignItems: "center" }}>{ExFields({ bk: bk || "block1", di, ei, ex: ex1 })}<input value={ex1?.notes || ""} onChange={e => upEx(bk || "block1", di, ei, "notes", e.target.value)} placeholder="Notes" style={{ padding: "6px 6px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 40, minHeight: 30 }} /></div>}
-            {!bk && <div style={{ display: "flex", gap: 4, alignItems: "center" }}>{ex2 && ExFields({ bk: "block2", di, ei, ex: ex2 })}<input value={ex2?.notes || ""} onChange={e => upEx("block2", di, ei, "notes", e.target.value)} placeholder="Notes" style={{ padding: "6px 6px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 40, minHeight: 30 }} /></div>}
+            {!bk && <div style={{ display: "flex", gap: 4, alignItems: "center" }}>{ex2 && ExFields({ bk: "block2", di, ei: b2i, ex: ex2 })}<input value={ex2?.notes || ""} onChange={e => upEx("block2", di, b2i, "notes", e.target.value)} placeholder="Notes" style={{ padding: "6px 6px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 40, minHeight: 30 }} /></div>}
             {!bk && <button onClick={() => toggleSS(di, ei)} title="Toggle Superset" style={{ background: "none", border: "none", color: ex.ssGroup ? "#f0a030" : K.td, cursor: "pointer", padding: 2, opacity: 0.7, fontSize: 14 }}>SS</button>}
             <button onClick={() => rmEx(di, ei, targetBk)} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 2, opacity: 0.5 }}>{I.trash}</button>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: bk ? "20px minmax(120px, 1.5fr) minmax(280px, 1fr) 28px" : "20px minmax(100px, 1.2fr) minmax(190px, 1fr) minmax(190px, 1fr) 28px 28px", gap: 8, marginTop: 4, alignItems: "center" }}>
             <div></div><div></div>
             <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={(ex1 || ex)?.rest || ""} onChange={e => upEx(bk || "block1", di, ei, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>
-            {!bk && <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={ex2?.rest || ""} onChange={e => upEx("block2", di, ei, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>}
+            {!bk && <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={ex2?.rest || ""} onChange={e => upEx("block2", di, b2i, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>}
             <div></div>{!bk && <div></div>}
           </div>
         </div>
@@ -2104,14 +2111,16 @@ export default function App() {
                           </div>
                           {secExs.length === 0 && <div style={{ padding: "8px 12px", fontSize: 11, color: K.td, fontStyle: "italic", background: K.bg, borderRadius: 6 }}>No {sec.toLowerCase()} exercises — click + Add</div>}
                           {secExs.map(({ ex: ex1, ei }) => {
-                            const nonFinB2 = day2 ? day2.exercises.filter(e => e.section !== "Finisher") : [];
+                            const b2Exs = day2 ? day2.exercises : [];
+                            const nonFinB2 = b2Exs.filter(e => e.section !== "Finisher");
                             const nonFinB1Idx = allExs.filter(e => e.section !== "Finisher").indexOf(ex1);
                             const ex2 = nonFinB2[nonFinB1Idx] || null;
+                            const ei2 = ex2 ? b2Exs.indexOf(ex2) : -1;
                             const g = ex1.ssGroup;
                             const isSSStart = g && (ei === 0 || allExs[ei-1]?.ssGroup !== g);
                             const isSSEnd = g && (ei === allExs.length-1 || allExs[ei+1]?.ssGroup !== g);
                             const isSSMid = g && !isSSStart && !isSSEnd;
-                            return <div key={ei}>{ExRow({ di, ei, ex1, ex2, isSSStart, isSSMid, isSSEnd })}</div>;
+                            return <div key={ei}>{ExRow({ di, ei, ei2, ex1, ex2, isSSStart, isSSMid, isSSEnd })}</div>;
                           })}
                         </div>
                       );
