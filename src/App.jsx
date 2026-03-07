@@ -1719,7 +1719,7 @@ export default function App() {
 
             if (ex.section && ex.section !== lastSection && ex.section !== "Warm-Up") {
               if (lastSection !== "" || ei > 0) {
-                rows.push([{ content: ex.section.toUpperCase(), colSpan: 7, styles: { fillColor: [25, 50, 110], textColor: [130, 200, 255], fontStyle: "bold", fontSize: 7, cellPadding: 1.5 } }]);
+                rows.push([{ content: ex.section.toUpperCase(), colSpan: 6, styles: { fillColor: [25, 50, 110], textColor: [130, 200, 255], fontStyle: "bold", fontSize: 7, cellPadding: 1.5 } }]);
               }
               lastSection = ex.section;
             } else if (ei === 0 && ex.section) { lastSection = ex.section; }
@@ -1729,26 +1729,24 @@ export default function App() {
             const reps = (ex.reps !== undefined && ex.reps !== null && ex.reps !== "" && String(ex.reps) !== "undefined" && String(ex.reps) !== "null") ? String(ex.reps) : "";
             const weight = ex.weight || "—";
             const rest = fmtRest(ex.rest);
-            const rpe = ex.rpe || "";
             const notes = ex.notes || "";
-            rows.push([name || "", sets, reps, weight || "—", rest || "", rpe, notes || ""]);
+            rows.push([name || "", sets, reps, weight || "—", rest || "", notes || ""]);
           }
 
           autoTable(doc, {
             startY: y, margin: { left: margin, right: margin },
-            head: [["Esercizio", "Serie", "Rep", "Carico", "Rec.", "RPE", "Note"]],
+            head: [["Esercizio", "Serie", "Rep", "Carico", "Rec.", "Note"]],
             body: rows, theme: "grid",
             styles: { fontSize: 8, cellPadding: 2, lineColor: [220, 220, 225], lineWidth: 0.2, halign: "center" },
             headStyles: { fillColor: headerBg, textColor: white, fontStyle: "bold", fontSize: 8, halign: "center" },
             alternateRowStyles: { fillColor: rowAlt },
             columnStyles: {
-              0: { cellWidth: 65, fontStyle: "bold", halign: "left" },
-              1: { cellWidth: 16, halign: "center" },
-              2: { cellWidth: 22, halign: "center" },
-              3: { cellWidth: 26, halign: "center" },
-              4: { cellWidth: 16, halign: "center" },
-              5: { cellWidth: 16, halign: "center", fontStyle: "bold", textColor: [240, 160, 48] },
-              6: { cellWidth: "auto", fontStyle: "italic", fontSize: 7, textColor: [60, 80, 120], halign: "left" },
+              0: { cellWidth: 70, fontStyle: "bold", halign: "left" },
+              1: { cellWidth: 18, halign: "center" },
+              2: { cellWidth: 24, halign: "center" },
+              3: { cellWidth: 28, halign: "center" },
+              4: { cellWidth: 18, halign: "center" },
+              5: { cellWidth: "auto", fontStyle: "italic", fontSize: 7, textColor: [60, 80, 120], halign: "left" },
             },
           });
           y = doc.lastAutoTable.finalY + 8;
@@ -1811,6 +1809,28 @@ export default function App() {
     const [exPk, setExPk] = useState(null);
     const [showCmp, setShowCmp] = useState(false);
     const [collDay, setCollDay] = useState({});
+    const dragRef = useRef(null); // { di, ei } of dragged exercise
+    const [dragOver, setDragOver] = useState(null); // { di, ei } of current drop target
+
+    const moveEx = (di, fromIdx, toIdx) => {
+      if (fromIdx === toIdx) return;
+      const np = { ...p };
+      np.block1 = [...np.block1]; np.block1[di] = { ...np.block1[di] };
+      const exs = [...np.block1[di].exercises];
+      const [moved] = exs.splice(fromIdx, 1);
+      exs.splice(toIdx, 0, moved);
+      np.block1[di].exercises = exs;
+      if (np.block2 && np.block2[di]) {
+        np.block2 = [...np.block2]; np.block2[di] = { ...np.block2[di] };
+        const exs2 = [...np.block2[di].exercises];
+        if (exs2[fromIdx]) {
+          const [moved2] = exs2.splice(fromIdx, 1);
+          exs2.splice(toIdx, 0, moved2);
+          np.block2[di].exercises = exs2;
+        }
+      }
+      setP(np);
+    };
 
     // Keep cache ref in sync on every edit
     useEffect(() => { progEditCache.current[program.id] = p; }, [p]);
@@ -1922,12 +1942,23 @@ export default function App() {
       const ssRadius = isSSStart ? "10px 10px 0 0" : isSSEnd ? "0 0 10px 10px" : (isSSMid ? "0" : "10px");
       const ssMargin = (isSSMid || isSSEnd) ? 0 : 6;
 
+      const isDragTarget = dragOver && dragOver.di === di && dragOver.ei === ei;
+
       if (isCompact) {
         // COMPACT (mobile + tablet): stacked layout
         return (
-          <div style={{ background: K.cd, border: "1px solid " + K.bd, borderRadius: ssRadius, marginBottom: ssMargin, padding: 10, ...ssStyle }}>
+          <div
+            draggable
+            onDragStart={e => { dragRef.current = { di, ei }; e.dataTransfer.effectAllowed = "move"; e.currentTarget.style.opacity = "0.4"; }}
+            onDragEnd={e => { e.currentTarget.style.opacity = "1"; dragRef.current = null; setDragOver(null); }}
+            onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (!dragOver || dragOver.di !== di || dragOver.ei !== ei) setDragOver({ di, ei }); }}
+            onDragLeave={() => setDragOver(null)}
+            onDrop={e => { e.preventDefault(); if (dragRef.current && dragRef.current.di === di) moveEx(di, dragRef.current.ei, ei); dragRef.current = null; setDragOver(null); }}
+            style={{ background: K.cd, border: isDragTarget ? "2px solid " + K.ac : "1px solid " + K.bd, borderRadius: ssRadius, marginBottom: ssMargin, padding: 10, ...ssStyle, transition: "border 0.15s" }}
+          >
             {isSSStart && <div style={{ fontSize: 9, fontWeight: 700, color: "#f0a030", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Superset</div>}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6, marginBottom: 8 }}>
+              <div style={{ cursor: "grab", color: K.td, fontSize: 14, padding: "0 4px", userSelect: "none", touchAction: "none" }}>⠿</div>
               <div style={{ color: K.tx, fontWeight: 500, fontSize: 13, cursor: "pointer", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }} onClick={() => setExPk({ di, sec: ex.section, idx: ei, rep: true })}>
                 {ex.name}
               </div>
@@ -1948,11 +1979,20 @@ export default function App() {
         );
       }
 
-      // DESKTOP: single-row grid — name | W1-2 fields + notes | W3-4 fields + notes | SS | trash
+      // DESKTOP: single-row grid — grip | name | W1-2 fields + notes | W3-4 fields + notes | SS | trash
       return (
-        <div style={{ background: K.cd, border: "1px solid " + K.bd, borderRadius: ssRadius, marginBottom: ssMargin, padding: "8px 12px", ...ssStyle }}>
+        <div
+          draggable
+          onDragStart={e => { dragRef.current = { di, ei }; e.dataTransfer.effectAllowed = "move"; e.currentTarget.style.opacity = "0.4"; }}
+          onDragEnd={e => { e.currentTarget.style.opacity = "1"; dragRef.current = null; setDragOver(null); }}
+          onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (!dragOver || dragOver.di !== di || dragOver.ei !== ei) setDragOver({ di, ei }); }}
+          onDragLeave={() => setDragOver(null)}
+          onDrop={e => { e.preventDefault(); if (dragRef.current && dragRef.current.di === di) moveEx(di, dragRef.current.ei, ei); dragRef.current = null; setDragOver(null); }}
+          style={{ background: K.cd, border: isDragTarget ? "2px solid " + K.ac : "1px solid " + K.bd, borderRadius: ssRadius, marginBottom: ssMargin, padding: "8px 12px", ...ssStyle, transition: "border 0.15s" }}
+        >
           {isSSStart && <div style={{ fontSize: 9, fontWeight: 700, color: "#f0a030", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Superset</div>}
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(120px, 1.2fr) minmax(200px, 1fr) minmax(200px, 1fr) 28px 28px", gap: 8, alignItems: "center" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "20px minmax(120px, 1.2fr) minmax(200px, 1fr) minmax(200px, 1fr) 28px 28px", gap: 8, alignItems: "center" }}>
+            <div style={{ cursor: "grab", color: K.td, fontSize: 16, userSelect: "none", textAlign: "center" }}>⠿</div>
             <div style={{ color: K.tx, fontWeight: 500, fontSize: 13, cursor: "pointer", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} onClick={() => setExPk({ di, sec: ex.section, idx: ei, rep: true })}>
               {ex.name}{ex.circuit && <span style={{ fontSize: 10, color: K.td, marginLeft: 4 }}>({ex.circuit.join(", ")})</span>}
             </div>
@@ -1961,8 +2001,8 @@ export default function App() {
             <button onClick={() => toggleSS(di, ei)} title="Toggle Superset" style={{ background: "none", border: "none", color: ex.ssGroup ? "#f0a030" : K.td, cursor: "pointer", padding: 2, opacity: 0.7, fontSize: 14 }}>SS</button>
             <button onClick={() => rmEx(di, ei)} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 2, opacity: 0.5 }}>{I.trash}</button>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(120px, 1.2fr) minmax(200px, 1fr) minmax(200px, 1fr) 28px 28px", gap: 8, marginTop: 4, alignItems: "center" }}>
-            <div></div>
+          <div style={{ display: "grid", gridTemplateColumns: "20px minmax(120px, 1.2fr) minmax(200px, 1fr) minmax(200px, 1fr) 28px 28px", gap: 8, marginTop: 4, alignItems: "center" }}>
+            <div></div><div></div>
             <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={ex1?.rest || ""} onChange={e => upEx("block1", di, ei, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>
             <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={ex2?.rest || ""} onChange={e => upEx("block2", di, ei, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>
             <div></div><div></div>
@@ -2020,7 +2060,8 @@ export default function App() {
 
                   {!isCollapsed && <div style={{ border: "1px solid " + K.bd, borderTop: "none", borderRadius: "0 0 10px 10px", padding: isMobile ? 8 : 12 }}>
                     {/* Column headers - wide desktop only */}
-                    {!isCompact && <div style={{ display: "grid", gridTemplateColumns: "minmax(120px, 1.2fr) minmax(200px, 1fr) minmax(200px, 1fr) 28px 28px", gap: 8, padding: "0 12px 6px", borderBottom: "1px solid " + K.bd, marginBottom: 8 }}>
+                    {!isCompact && <div style={{ display: "grid", gridTemplateColumns: "20px minmax(120px, 1.2fr) minmax(200px, 1fr) minmax(200px, 1fr) 28px 28px", gap: 8, padding: "0 12px 6px", borderBottom: "1px solid " + K.bd, marginBottom: 8 }}>
+                      <span></span>
                       <span style={{ fontSize: 10, color: K.td, fontWeight: 600 }}>EXERCISE</span>
                       <span style={{ fontSize: 10, color: K.td, fontWeight: 600 }}>BLOCK 1 (W1-2)</span>
                       <span style={{ fontSize: 10, color: K.td, fontWeight: 600 }}>BLOCK 2 (W3-4)</span>
