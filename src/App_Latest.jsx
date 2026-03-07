@@ -1714,22 +1714,35 @@ export default function App() {
           const rows = [];
           let lastSection = "";
           let lastSSGroup = "";
+          let ssLetter = 64; // ASCII before 'A', will increment to 'A' for first SS
+          let ssIndex = 0;
           for (let ei = 0; ei < exs.length; ei++) {
             const ex = exs[ei];
             if (!ex) continue;
 
+            // Section headers
             if (ex.section && ex.section !== lastSection) {
               rows.push([{ content: ex.section.toUpperCase(), colSpan: 6, styles: { fillColor: [25, 50, 110], textColor: [130, 200, 255], fontStyle: "bold", fontSize: 7, cellPadding: 1.5 } }]);
               lastSection = ex.section;
             }
 
-            // Superset indicator
-            if (ex.ssGroup && ex.ssGroup !== lastSSGroup) {
-              rows.push([{ content: "⚡ SUPERSET", colSpan: 6, styles: { fillColor: [60, 40, 10], textColor: [240, 160, 48], fontStyle: "bold", fontSize: 7, cellPadding: 1.2 } }]);
+            // Superset grouping
+            if (ex.ssGroup) {
+              if (ex.ssGroup !== lastSSGroup) {
+                // New superset group
+                ssLetter++;
+                ssIndex = 1;
+                lastSSGroup = ex.ssGroup;
+                rows.push([{ content: "SUPERSET " + String.fromCharCode(ssLetter), colSpan: 6, styles: { fillColor: [50, 35, 8], textColor: [240, 160, 48], fontStyle: "bold", fontSize: 7, cellPadding: 1.2 } }]);
+              } else {
+                ssIndex++;
+              }
+            } else {
+              lastSSGroup = "";
             }
-            lastSSGroup = ex.ssGroup || "";
 
-            const name = (ex.name || "") + (ex.circuit ? " (" + ex.circuit.join(", ") + ")" : "");
+            const prefix = ex.ssGroup ? String.fromCharCode(ssLetter) + ssIndex + ") " : "";
+            const name = prefix + (ex.name || "") + (ex.circuit ? " (" + ex.circuit.join(", ") + ")" : "");
             const sets = (ex.sets !== undefined && ex.sets !== null && ex.sets !== "" && String(ex.sets) !== "undefined" && String(ex.sets) !== "null") ? String(ex.sets) : "";
             const reps = (ex.reps !== undefined && ex.reps !== null && ex.reps !== "" && String(ex.reps) !== "undefined" && String(ex.reps) !== "null") ? String(ex.reps) : "";
             const weight = ex.weight || "—";
@@ -1859,6 +1872,23 @@ export default function App() {
       const np = { ...p }; np.block1 = [...np.block1]; np.block1[di] = { ...np.block1[di] }; np.block1[di].exercises = np.block1[di].exercises.filter(e => e.section !== sec);
       syncBlock2Structure(np); setP(np);
     };
+    const addDay = (dayType) => {
+      const np = { ...p };
+      const dl = { A: "Push + Squat", B: "Pull + Hinge", Q: "Quad + Push", H: "Hinge + Pull", G: "Glute Focus", F: "Full Body" };
+      const num = np.block1.length + 1;
+      const nd = { dayLabel: "Day " + num, focus: dl[dayType] || "Full Body", dayType, exercises: [] };
+      np.block1 = [...np.block1, nd];
+      np.block2 = [...(np.block2 || []), { ...nd }];
+      setP(np); setShowAddDay(false);
+    };
+    const rmDay = (di) => {
+      if (p.block1.length <= 1) return;
+      const np = { ...p };
+      np.block1 = np.block1.filter((_, i) => i !== di).map((d, i) => ({ ...d, dayLabel: "Day " + (i + 1) }));
+      np.block2 = (np.block2 || []).filter((_, i) => i !== di).map((d, i) => ({ ...d, dayLabel: "Day " + (i + 1) }));
+      setP(np);
+    };
+    const [showAddDay, setShowAddDay] = useState(false);
     const repEx = (di, ei, nx) => {
       const np = { ...p }; np.block1 = [...np.block1]; np.block1[di] = { ...np.block1[di] }; np.block1[di].exercises = [...np.block1[di].exercises];
       const o = np.block1[di].exercises[ei]; np.block1[di].exercises[ei] = { ...nx, section: o.section, sets: o.sets, reps: o.reps, rest: o.rest, weight: o.weight, rpe: o.rpe, notes: o.notes || "", ssGroup: o.ssGroup };
@@ -1984,7 +2014,7 @@ export default function App() {
         {/* Header */}
         <div className="tf-prog-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, position: "sticky", top: isMobile ? 53 : 0, zIndex: 10, background: K.bg, padding: "12px 0", gap: 8, flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}><button onClick={() => { onSave(p); onBack(); }} style={{ background: "none", border: "none", color: K.tm, cursor: "pointer", padding: 4, flexShrink: 0 }}>{I.back}</button><div style={{ minWidth: 0 }}><h2 style={{ margin: 0, fontSize: isMobile ? 16 : 20, color: K.tx, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.clientName}</h2><div style={{ fontSize: 11, color: K.tm, display: "flex", gap: 6, alignItems: "center", marginTop: 4, flexWrap: "wrap" }}>Mo.{p.monthNumber} · <LvlBadge level={p.level} /><span>{p.sessionsPerWeek}×/wk</span><span>{p.sessionDuration}min</span>{p.trainingLocation === "home" && <span style={{ padding: "2px 6px", borderRadius: 4, fontSize: 9, fontWeight: 600, background: "rgba(200,255,46,0.15)", color: K.ac }}>🏠</span>}</div></div></div>
-          <div className="tf-prog-btns" style={{ display: "flex", gap: 6, flexWrap: "wrap", flexShrink: 0 }}>{prevProgram && <Btn v={showCmp ? "primary" : "secondary"} sm onClick={() => setShowCmp(!showCmp)} icon={I.history}>{showCmp ? "Hide" : "Cmp"}</Btn>}<Btn v="secondary" sm onClick={() => exportPDF(p)} icon={pdfIcon}>PDF</Btn><Btn v="secondary" sm onClick={() => { setP(JSON.parse(JSON.stringify(program))); notify("Reset", "warn"); }} icon={I.refresh}>Reset</Btn><Btn v="danger" sm onClick={() => setConfDelPr(p)} icon={I.trash}>Del</Btn><Btn sm onClick={() => { onPersist(p); notify("Saved!"); }}>Save</Btn></div>
+          <div className="tf-prog-btns" style={{ display: "flex", gap: 6, flexWrap: "wrap", flexShrink: 0 }}>{prevProgram && <Btn v={showCmp ? "primary" : "secondary"} sm onClick={() => setShowCmp(!showCmp)} icon={I.history}>{showCmp ? "Hide" : "Cmp"}</Btn>}<Btn v="secondary" sm onClick={() => exportPDF(p)} icon={pdfIcon}>PDF</Btn><Btn v="secondary" sm onClick={() => { setP(JSON.parse(JSON.stringify(program))); notify("Reset", "warn"); }} icon={I.refresh}>Reset</Btn><Btn v="danger" sm onClick={() => setConfDelPr(p)} icon={I.trash}>Del</Btn><Btn sm onClick={() => { onSave(p); notify("Saved!"); }}>Save</Btn></div>
         </div>
 
         <div style={{ display: "flex", gap: 16, flexDirection: isCompact ? "column" : "row" }}>
@@ -2023,6 +2053,7 @@ export default function App() {
                     <span style={{ fontWeight: 700, fontSize: 14, color: K.tx }}>{day.dayLabel}</span>
                     <span style={{ fontSize: 12, color: K.tm }}>{day.focus}</span>
                     <span style={{ fontSize: 11, color: K.td, marginLeft: "auto" }}>{day.exercises.filter(e => e.section === "Strength").length} exercises</span>
+                    {p.block1.length > 1 && <button onClick={e => { e.stopPropagation(); if(confirm("Remove " + day.dayLabel + "?")) rmDay(di); }} style={{ background: "none", border: "none", color: K.dg, cursor: "pointer", padding: "2px 6px", fontSize: 11, opacity: 0.7 }} title="Remove day">✕</button>}
                   </div>
 
                   {!isCollapsed && <div style={{ border: "1px solid " + K.bd, borderTop: "none", borderRadius: "0 0 10px 10px", padding: isMobile ? 8 : 12 }}>
@@ -2046,7 +2077,7 @@ export default function App() {
                               <Btn v="ghost" sm onClick={() => setExPk({ di, sec })} icon={I.plus}>Add</Btn>
                             </div>
                           </div>
-                          {secExs.length === 0 && <div style={{ padding: "8px 12px", fontSize: 11, color: K.td, fontStyle: "italic", background: K.bg, borderRadius: 6 }}>No {sec.toLowerCase()} exercises</div>}
+                          {secExs.length === 0 && <div style={{ padding: "8px 12px", fontSize: 11, color: K.td, fontStyle: "italic", background: K.bg, borderRadius: 6 }}>No {sec.toLowerCase()} exercises — click + Add</div>}
                           {secExs.map(({ ex: ex1, ei }) => {
                             const ex2 = day2 ? day2.exercises[ei] : null;
                             const exs = day.exercises;
@@ -2063,6 +2094,23 @@ export default function App() {
                 </div>
               );
             })}
+
+            {/* Add Day */}
+            <div style={{ marginBottom: 24 }}>
+              {!showAddDay ? (
+                <button onClick={() => setShowAddDay(true)} style={{ width: "100%", padding: "12px 16px", border: "2px dashed " + K.bd, borderRadius: 10, background: "transparent", color: K.tm, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>{I.plus} Add Training Day</button>
+              ) : (
+                <div style={{ padding: 14, border: "1px solid " + K.bd, borderRadius: 10, background: K.sf }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: K.tx, marginBottom: 10 }}>Select day type:</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {[["A","Push + Squat","#5dade2"],["B","Pull + Hinge","#f0a030"],["Q","Quad + Push","#5dade2"],["H","Hinge + Pull","#f0a030"],["G","Glute Focus","#e74c3c"],["F","Full Body","#2ecc71"]].map(([t,l,c]) => (
+                      <button key={t} onClick={() => addDay(t)} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid " + c + "50", background: c + "20", color: c, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{l}</button>
+                    ))}
+                    <button onClick={() => setShowAddDay(false)} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid " + K.bd, background: "transparent", color: K.td, fontSize: 12, cursor: "pointer" }}>Cancel</button>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Running */}
             <div style={{ marginTop: 8, marginBottom: 24 }}>
