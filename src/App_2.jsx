@@ -1869,10 +1869,9 @@ export default function App() {
         const oldFinishers = oldExs.filter(e => e.section === "Finisher");
         const b1NonFin = day.exercises.filter(e => e.section !== "Finisher");
         const oldNonFin = oldExs.filter(e => e.section !== "Finisher");
-        const newExs = b1NonFin.map((b1ex) => {
-          // Match by ID regardless of position — survives reorder/add/remove
-          const oldEx = oldNonFin.find(e => e.id === b1ex.id);
-          if (oldEx) {
+        const newExs = b1NonFin.map((b1ex, ei) => {
+          const oldEx = oldNonFin[ei];
+          if (oldEx && oldEx.id === b1ex.id) {
             return { ...oldEx, section: b1ex.section, ssGroup: b1ex.ssGroup, circuit: b1ex.circuit };
           }
           return microProgress([b1ex], np.level || "intermediate")[0];
