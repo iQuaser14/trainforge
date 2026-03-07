@@ -1697,8 +1697,7 @@ export default function App() {
         for (let di = 0; di < blockData.length; di++) {
           const day = blockData[di];
           if (!day) continue;
-          const validSections = new Set(["Warm-Up", "Strength", "Core", "Finisher"]);
-          const exs = (day.exercises || []).filter(e => validSections.has(e.section));
+          const exs = day.exercises || [];
 
           const estHeight = 12 + exs.length * 6.5 + 8;
           if (y + estHeight > H - 10) { doc.addPage(); y = margin; }
@@ -1792,9 +1791,8 @@ export default function App() {
     const cardio1 = prog.cardio ? (prog.cardio.block1 || []) : [];
     buildBlockPDF(doc, prog.block1, 1, "Sett. 1-2", cardio1);
 
-    // Sanitize block2: only include exercises visible in the editor
-    // Non-Finisher: only those matching block1 exercises by ID
-    // Finisher: block2's own finisher exercises
+    // Sanitize block2: for non-Finisher, only include exercises matching block1 by ID
+    // For Finisher, use block2's own exercises. This ensures PDF matches what the editor shows.
     const cleanBlock2 = (prog.block1 || []).map((b1Day, di) => {
       const b2Day = (prog.block2 || [])[di];
       if (!b2Day) return b1Day;
