@@ -1791,8 +1791,23 @@ export default function App() {
     const cardio1 = prog.cardio ? (prog.cardio.block1 || []) : [];
     buildBlockPDF(doc, prog.block1, 1, "Sett. 1-2", cardio1);
 
+    // Sanitize block2: for non-Finisher, only include exercises matching block1 by ID
+    // For Finisher, use block2's own exercises. This ensures PDF matches what the editor shows.
+    const cleanBlock2 = (prog.block1 || []).map((b1Day, di) => {
+      const b2Day = (prog.block2 || [])[di];
+      if (!b2Day) return b1Day;
+      const b2Exs = b2Day.exercises || [];
+      const b1NonFin = (b1Day.exercises || []).filter(e => e.section !== "Finisher");
+      const b2Finishers = b2Exs.filter(e => e.section === "Finisher");
+      const pairedExs = b1NonFin.map(b1ex => {
+        const match = b2Exs.find(e => e.id === b1ex.id && e.section !== "Finisher");
+        return match || b1ex;
+      });
+      return { ...b2Day, exercises: [...pairedExs, ...b2Finishers] };
+    });
+
     const cardio2 = prog.cardio ? (prog.cardio.block2 || []) : [];
-    buildBlockPDF(doc, prog.block2, 2, "Sett. 3-4", cardio2);
+    buildBlockPDF(doc, cleanBlock2, 2, "Sett. 3-4", cardio2);
 
     // Remove blank first page
     doc.deletePage(1);
