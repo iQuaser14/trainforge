@@ -1855,44 +1855,36 @@ export default function App() {
       return () => clearTimeout(timer);
     }, [p]);
 
-    // Smart sync: only syncs STRUCTURE to block2, preserving manual edits
-    const syncBlock2Structure = (np) => {
-      if (!np.block1) return np;
-      if (!np.block2) {
-        np.block2 = np.block1.map(day => ({ ...day, exercises: microProgress(day.exercises, np.level || "intermediate") }));
-        return np;
-      }
-      np.block2 = np.block1.map((day, di) => {
-        const oldDay = (np.block2[di] || {});
-        const oldExs = oldDay.exercises || [];
-        // Preserve block2 Finisher exercises independently
-        const oldFinishers = oldExs.filter(e => e.section === "Finisher");
-        const b1NonFin = day.exercises.filter(e => e.section !== "Finisher");
-        const oldNonFin = oldExs.filter(e => e.section !== "Finisher");
-        const newExs = b1NonFin.map((b1ex) => {
-          // Match by ID regardless of position — survives reorder/add/remove
-          const oldEx = oldNonFin.find(e => e.id === b1ex.id);
-          if (oldEx) {
-            return { ...oldEx, section: b1ex.section, ssGroup: b1ex.ssGroup, circuit: b1ex.circuit };
-          }
-          return microProgress([b1ex], np.level || "intermediate")[0];
-        });
-        return { ...day, exercises: [...newExs, ...oldFinishers] };
-      });
-      return np;
-    };
     const upEx = (bk, di, ei, fld, val) => {
       const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = [...np[bk][di].exercises]; np[bk][di].exercises[ei] = { ...np[bk][di].exercises[ei], [fld]: val };
       setP(np);
     };
+    // Helper: find the index of an exercise in block2 that matches a block1 exercise by ID
+    const findB2Idx = (np, di, b1ExId) => {
+      if (!np.block2 || !np.block2[di]) return -1;
+      return np.block2[di].exercises.findIndex(e => e.id === b1ExId);
+    };
     const rmEx = (di, ei, bk = "block1") => {
-      const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = np[bk][di].exercises.filter((_, i) => i !== ei);
-      if (bk === "block1") syncBlock2Structure(np);
+      const np = { ...p };
+      const removedEx = np[bk][di].exercises[ei];
+      np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = np[bk][di].exercises.filter((_, i) => i !== ei);
+      // Mirror removal in block2 if editing block1 (non-Finisher only)
+      if (bk === "block1" && removedEx && removedEx.section !== "Finisher" && np.block2 && np.block2[di]) {
+        np.block2 = [...np.block2]; np.block2[di] = { ...np.block2[di] };
+        const b2i = findB2Idx(np, di, removedEx.id);
+        if (b2i >= 0) np.block2[di].exercises = np.block2[di].exercises.filter((_, i) => i !== b2i);
+      }
       setP(np);
     };
     const rmSection = (di, sec, bk = "block1") => {
-      const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = np[bk][di].exercises.filter(e => e.section !== sec);
-      if (bk === "block1") syncBlock2Structure(np);
+      const np = { ...p };
+      const removedIds = new Set(np[bk][di].exercises.filter(e => e.section === sec).map(e => e.id));
+      np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = np[bk][di].exercises.filter(e => e.section !== sec);
+      // Mirror removal in block2
+      if (bk === "block1" && sec !== "Finisher" && np.block2 && np.block2[di]) {
+        np.block2 = [...np.block2]; np.block2[di] = { ...np.block2[di] };
+        np.block2[di].exercises = np.block2[di].exercises.filter(e => !removedIds.has(e.id));
+      }
       setP(np);
     };
     const addDay = (dayType) => {
@@ -1914,8 +1906,17 @@ export default function App() {
     const [showAddDay, setShowAddDay] = useState(false);
     const repEx = (di, ei, nx, bk = "block1") => {
       const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = [...np[bk][di].exercises];
-      const o = np[bk][di].exercises[ei]; np[bk][di].exercises[ei] = { ...nx, section: o.section, sets: o.sets, reps: o.reps, rest: o.rest, weight: o.weight, rpe: o.rpe, notes: o.notes || "", ssGroup: o.ssGroup };
-      if (bk === "block1") syncBlock2Structure(np);
+      const o = np[bk][di].exercises[ei];
+      np[bk][di].exercises[ei] = { ...nx, section: o.section, sets: o.sets, reps: o.reps, rest: o.rest, weight: o.weight, rpe: o.rpe, notes: o.notes || "", ssGroup: o.ssGroup };
+      // Mirror replacement in block2
+      if (bk === "block1" && o.section !== "Finisher" && np.block2 && np.block2[di]) {
+        np.block2 = [...np.block2]; np.block2[di] = { ...np.block2[di] }; np.block2[di].exercises = [...np.block2[di].exercises];
+        const b2i = findB2Idx(np, di, o.id);
+        if (b2i >= 0) {
+          const o2 = np.block2[di].exercises[b2i];
+          np.block2[di].exercises[b2i] = { ...nx, section: o2.section, sets: o2.sets, reps: o2.reps, rest: o2.rest, weight: o2.weight, rpe: o2.rpe, notes: o2.notes || "", ssGroup: o2.ssGroup };
+        }
+      }
       setP(np); setExPk(null);
     };
     const addExToBlock = (bk, di, sec, ex) => {
@@ -1930,7 +1931,17 @@ export default function App() {
       if (ia === -1) { ia = exs.length; for (let s = secIdx + 1; s < secOrder.length; s++) { const fi = exs.findIndex(e => e.section === secOrder[s]); if (fi !== -1) { ia = fi; break; } } }
       exs.splice(ia, 0, ne);
       np[bk][di].exercises = exs;
-      if (bk === "block1") syncBlock2Structure(np);
+      // Mirror addition in block2 (with micro-progression for non-Finisher)
+      if (bk === "block1" && sec !== "Finisher" && np.block2 && np.block2[di]) {
+        np.block2 = [...np.block2]; np.block2[di] = { ...np.block2[di] };
+        const exs2 = [...np.block2[di].exercises];
+        const ne2 = microProgress([ne], np.level || "intermediate")[0];
+        let ia2 = -1;
+        for (let i = exs2.length - 1; i >= 0; i--) { if (exs2[i].section === sec) { ia2 = i + 1; break; } }
+        if (ia2 === -1) { ia2 = exs2.length; for (let s = secIdx + 1; s < secOrder.length; s++) { const fi = exs2.findIndex(e => e.section === secOrder[s]); if (fi !== -1) { ia2 = fi; break; } } }
+        exs2.splice(ia2, 0, ne2);
+        np.block2[di].exercises = exs2;
+      }
       setP(np); setExPk(null);
     };
 
@@ -1939,19 +1950,30 @@ export default function App() {
       const np = { ...p }; np.block1 = [...np.block1]; np.block1[di] = { ...np.block1[di] }; np.block1[di].exercises = [...np.block1[di].exercises];
       const exs = np.block1[di].exercises;
       const ex = exs[ei];
-      if (ei >= exs.length - 1) return; // can't SS last exercise
+      if (ei >= exs.length - 1) return;
       const next = exs[ei + 1];
       if (ex.ssGroup && ex.ssGroup === next.ssGroup) {
-        // Remove superset grouping
         const gid = ex.ssGroup;
         exs.forEach((e, i) => { if (e.ssGroup === gid) { exs[i] = { ...e }; delete exs[i].ssGroup; } });
+        // Mirror in block2
+        if (np.block2 && np.block2[di]) {
+          np.block2 = [...np.block2]; np.block2[di] = { ...np.block2[di] }; np.block2[di].exercises = [...np.block2[di].exercises];
+          np.block2[di].exercises.forEach((e, i) => { if (e.ssGroup === gid) { np.block2[di].exercises[i] = { ...e }; delete np.block2[di].exercises[i].ssGroup; } });
+        }
       } else {
-        // Create/extend superset group
         const gid = ex.ssGroup || next.ssGroup || ("ss_" + di + "_" + ei);
         exs[ei] = { ...ex, ssGroup: gid };
         exs[ei + 1] = { ...next, ssGroup: gid };
+        // Mirror in block2
+        if (np.block2 && np.block2[di]) {
+          np.block2 = [...np.block2]; np.block2[di] = { ...np.block2[di] }; np.block2[di].exercises = [...np.block2[di].exercises];
+          const b2i = findB2Idx(np, di, ex.id);
+          const b2i2 = findB2Idx(np, di, next.id);
+          if (b2i >= 0) np.block2[di].exercises[b2i] = { ...np.block2[di].exercises[b2i], ssGroup: gid };
+          if (b2i2 >= 0) np.block2[di].exercises[b2i2] = { ...np.block2[di].exercises[b2i2], ssGroup: gid };
+        }
       }
-      syncBlock2Structure(np); setP(np);
+      setP(np);
     };
 
     const sc = s => ({ "Warm-Up": "#6eb5ff", Strength: K.ac, Core: "#b388ff", Finisher: K.dg }[s] || K.tm);

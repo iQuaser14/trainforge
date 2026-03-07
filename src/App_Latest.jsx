@@ -1869,9 +1869,10 @@ export default function App() {
         const oldFinishers = oldExs.filter(e => e.section === "Finisher");
         const b1NonFin = day.exercises.filter(e => e.section !== "Finisher");
         const oldNonFin = oldExs.filter(e => e.section !== "Finisher");
-        const newExs = b1NonFin.map((b1ex, ei) => {
-          const oldEx = oldNonFin[ei];
-          if (oldEx && oldEx.id === b1ex.id) {
+        const newExs = b1NonFin.map((b1ex) => {
+          // Match by ID regardless of position — survives reorder/add/remove
+          const oldEx = oldNonFin.find(e => e.id === b1ex.id);
+          if (oldEx) {
             return { ...oldEx, section: b1ex.section, ssGroup: b1ex.ssGroup, circuit: b1ex.circuit };
           }
           return microProgress([b1ex], np.level || "intermediate")[0];
@@ -1894,6 +1895,23 @@ export default function App() {
       if (bk === "block1") syncBlock2Structure(np);
       setP(np);
     };
+    const addDay = (dayType) => {
+      const np = { ...p };
+      const dl = { A: "Push + Squat", B: "Pull + Hinge", Q: "Quad + Push", H: "Hinge + Pull", G: "Glute Focus", F: "Full Body" };
+      const num = np.block1.length + 1;
+      const nd = { dayLabel: "Day " + num, focus: dl[dayType] || "Full Body", dayType, exercises: [] };
+      np.block1 = [...np.block1, nd];
+      np.block2 = [...(np.block2 || []), { ...nd }];
+      setP(np); setShowAddDay(false);
+    };
+    const rmDay = (di) => {
+      if (p.block1.length <= 1) return;
+      const np = { ...p };
+      np.block1 = np.block1.filter((_, i) => i !== di).map((d, i) => ({ ...d, dayLabel: "Day " + (i + 1) }));
+      np.block2 = (np.block2 || []).filter((_, i) => i !== di).map((d, i) => ({ ...d, dayLabel: "Day " + (i + 1) }));
+      setP(np);
+    };
+    const [showAddDay, setShowAddDay] = useState(false);
     const repEx = (di, ei, nx, bk = "block1") => {
       const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = [...np[bk][di].exercises];
       const o = np[bk][di].exercises[ei]; np[bk][di].exercises[ei] = { ...nx, section: o.section, sets: o.sets, reps: o.reps, rest: o.rest, weight: o.weight, rpe: o.rpe, notes: o.notes || "", ssGroup: o.ssGroup };
@@ -1974,9 +1992,10 @@ export default function App() {
     );
 
     // Render one exercise row with both blocks side by side
-    const ExRow = ({ di, ei, ex1, ex2, isSSStart, isSSMid, isSSEnd, bk }) => {
+    const ExRow = ({ di, ei, ei2, ex1, ex2, isSSStart, isSSMid, isSSEnd, bk }) => {
       const ex = ex1 || ex2;
       const targetBk = bk || "block1";
+      const b2i = ei2 != null && ei2 >= 0 ? ei2 : ei; // block2 index, fallback to ei
       const ssStyle = (isSSStart || isSSMid || isSSEnd) ? { borderLeft: "3px solid #f0a030", marginLeft: 0, paddingLeft: 8 } : {};
       const ssRadius = isSSStart ? "10px 10px 0 0" : isSSEnd ? "0 0 10px 10px" : (isSSMid ? "0" : "10px");
       const ssMargin = (isSSMid || isSSEnd) ? 0 : 6;
@@ -1999,12 +2018,18 @@ export default function App() {
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {ex1 && <div>{!bk && <span style={{ fontSize: 8, color: K.td }}>W1-2</span>}{ExFields({ bk: bk || "block1", di, ei, ex: ex1 })}</div>}
-              {!bk && ex2 && <div><span style={{ fontSize: 8, color: K.td }}>W3-4</span>{ExFields({ bk: "block2", di, ei, ex: ex2 })}</div>}
+              {!bk && ex2 && <div><span style={{ fontSize: 8, color: K.td }}>W3-4</span>{ExFields({ bk: "block2", di, ei: b2i, ex: ex2 })}</div>}
             </div>
             <div style={{ display: "flex", gap: 6, marginTop: 6, alignItems: "center", flexWrap: "wrap" }}>
+              {!bk && <span style={{ fontSize: 8, color: K.td, flexBasis: "100%" }}>W1-2</span>}
               <input value={(ex1 || ex)?.notes || ""} onChange={e => upEx(bk || "block1", di, ei, "notes", e.target.value)} placeholder="Notes..." style={{ padding: "3px 8px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 80 }} />
               <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={(ex1 || ex)?.rest || ""} onChange={e => upEx(bk || "block1", di, ei, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>
             </div>
+            {!bk && ex2 && <div style={{ display: "flex", gap: 6, marginTop: 4, alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ fontSize: 8, color: K.td, flexBasis: "100%" }}>W3-4</span>
+              <input value={ex2?.notes || ""} onChange={e => upEx("block2", di, b2i, "notes", e.target.value)} placeholder="Notes..." style={{ padding: "3px 8px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 80 }} />
+              <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={ex2?.rest || ""} onChange={e => upEx("block2", di, b2i, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>
+            </div>}
           </div>
         );
       }
@@ -2018,14 +2043,14 @@ export default function App() {
               {ex.name}{ex.circuit && <span style={{ fontSize: 10, color: K.td, marginLeft: 4 }}>({ex.circuit.join(", ")})</span>}
             </div>
             {ex1 && <div style={{ display: "flex", gap: 4, alignItems: "center" }}>{ExFields({ bk: bk || "block1", di, ei, ex: ex1 })}<input value={ex1?.notes || ""} onChange={e => upEx(bk || "block1", di, ei, "notes", e.target.value)} placeholder="Notes" style={{ padding: "6px 6px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 40, minHeight: 30 }} /></div>}
-            {!bk && <div style={{ display: "flex", gap: 4, alignItems: "center" }}>{ex2 && ExFields({ bk: "block2", di, ei, ex: ex2 })}<input value={ex2?.notes || ""} onChange={e => upEx("block2", di, ei, "notes", e.target.value)} placeholder="Notes" style={{ padding: "6px 6px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 40, minHeight: 30 }} /></div>}
+            {!bk && <div style={{ display: "flex", gap: 4, alignItems: "center" }}>{ex2 && ExFields({ bk: "block2", di, ei: b2i, ex: ex2 })}<input value={ex2?.notes || ""} onChange={e => upEx("block2", di, b2i, "notes", e.target.value)} placeholder="Notes" style={{ padding: "6px 6px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 40, minHeight: 30 }} /></div>}
             {!bk && <button onClick={() => toggleSS(di, ei)} title="Toggle Superset" style={{ background: "none", border: "none", color: ex.ssGroup ? "#f0a030" : K.td, cursor: "pointer", padding: 2, opacity: 0.7, fontSize: 14 }}>SS</button>}
             <button onClick={() => rmEx(di, ei, targetBk)} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 2, opacity: 0.5 }}>{I.trash}</button>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: bk ? "20px minmax(120px, 1.5fr) minmax(280px, 1fr) 28px" : "20px minmax(100px, 1.2fr) minmax(190px, 1fr) minmax(190px, 1fr) 28px 28px", gap: 8, marginTop: 4, alignItems: "center" }}>
             <div></div><div></div>
             <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={(ex1 || ex)?.rest || ""} onChange={e => upEx(bk || "block1", di, ei, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>
-            {!bk && <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={ex2?.rest || ""} onChange={e => upEx("block2", di, ei, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>}
+            {!bk && <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={ex2?.rest || ""} onChange={e => upEx("block2", di, b2i, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>}
             <div></div>{!bk && <div></div>}
           </div>
         </div>
@@ -2077,6 +2102,7 @@ export default function App() {
                     <span style={{ fontWeight: 700, fontSize: 14, color: K.tx }}>{day.dayLabel}</span>
                     <span style={{ fontSize: 12, color: K.tm }}>{day.focus}</span>
                     <span style={{ fontSize: 11, color: K.td, marginLeft: "auto" }}>{day.exercises.filter(e => e.section === "Strength").length} exercises</span>
+                    {p.block1.length > 1 && <button onClick={e => { e.stopPropagation(); if(confirm("Remove " + day.dayLabel + "?")) rmDay(di); }} style={{ background: "none", border: "none", color: K.dg, cursor: "pointer", padding: "2px 6px", fontSize: 11, opacity: 0.7 }} title="Remove day">✕</button>}
                   </div>
 
                   {!isCollapsed && <div style={{ border: "1px solid " + K.bd, borderTop: "none", borderRadius: "0 0 10px 10px", padding: isMobile ? 8 : 12 }}>
@@ -2104,14 +2130,16 @@ export default function App() {
                           </div>
                           {secExs.length === 0 && <div style={{ padding: "8px 12px", fontSize: 11, color: K.td, fontStyle: "italic", background: K.bg, borderRadius: 6 }}>No {sec.toLowerCase()} exercises — click + Add</div>}
                           {secExs.map(({ ex: ex1, ei }) => {
-                            const nonFinB2 = day2 ? day2.exercises.filter(e => e.section !== "Finisher") : [];
+                            const b2Exs = day2 ? day2.exercises : [];
+                            const nonFinB2 = b2Exs.filter(e => e.section !== "Finisher");
                             const nonFinB1Idx = allExs.filter(e => e.section !== "Finisher").indexOf(ex1);
                             const ex2 = nonFinB2[nonFinB1Idx] || null;
+                            const ei2 = ex2 ? b2Exs.indexOf(ex2) : -1;
                             const g = ex1.ssGroup;
                             const isSSStart = g && (ei === 0 || allExs[ei-1]?.ssGroup !== g);
                             const isSSEnd = g && (ei === allExs.length-1 || allExs[ei+1]?.ssGroup !== g);
                             const isSSMid = g && !isSSStart && !isSSEnd;
-                            return <div key={ei}>{ExRow({ di, ei, ex1, ex2, isSSStart, isSSMid, isSSEnd })}</div>;
+                            return <div key={ei}>{ExRow({ di, ei, ei2, ex1, ex2, isSSStart, isSSMid, isSSEnd })}</div>;
                           })}
                         </div>
                       );
@@ -2144,6 +2172,23 @@ export default function App() {
                 </div>
               );
             })}
+
+            {/* Add Day */}
+            <div style={{ marginBottom: 24 }}>
+              {!showAddDay ? (
+                <button onClick={() => setShowAddDay(true)} style={{ width: "100%", padding: "12px 16px", border: "2px dashed " + K.bd, borderRadius: 10, background: "transparent", color: K.tm, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>{I.plus} Add Training Day</button>
+              ) : (
+                <div style={{ padding: 14, border: "1px solid " + K.bd, borderRadius: 10, background: K.sf }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: K.tx, marginBottom: 10 }}>Select day type:</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {[["A","Push + Squat","#5dade2"],["B","Pull + Hinge","#f0a030"],["Q","Quad + Push","#5dade2"],["H","Hinge + Pull","#f0a030"],["G","Glute Focus","#e74c3c"],["F","Full Body","#2ecc71"]].map(([t,l,c]) => (
+                      <button key={t} onClick={() => addDay(t)} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid " + c + "50", background: c + "20", color: c, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{l}</button>
+                    ))}
+                    <button onClick={() => setShowAddDay(false)} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid " + K.bd, background: "transparent", color: K.td, fontSize: 12, cursor: "pointer" }}>Cancel</button>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Running */}
             <div style={{ marginTop: 8, marginBottom: 24 }}>
