@@ -1894,23 +1894,6 @@ export default function App() {
       if (bk === "block1") syncBlock2Structure(np);
       setP(np);
     };
-    const addDay = (dayType) => {
-      const np = { ...p };
-      const dl = { A: "Push + Squat", B: "Pull + Hinge", Q: "Quad + Push", H: "Hinge + Pull", G: "Glute Focus", F: "Full Body" };
-      const num = np.block1.length + 1;
-      const nd = { dayLabel: "Day " + num, focus: dl[dayType] || "Full Body", dayType, exercises: [] };
-      np.block1 = [...np.block1, nd];
-      np.block2 = [...(np.block2 || []), { ...nd }];
-      setP(np); setShowAddDay(false);
-    };
-    const rmDay = (di) => {
-      if (p.block1.length <= 1) return;
-      const np = { ...p };
-      np.block1 = np.block1.filter((_, i) => i !== di).map((d, i) => ({ ...d, dayLabel: "Day " + (i + 1) }));
-      np.block2 = (np.block2 || []).filter((_, i) => i !== di).map((d, i) => ({ ...d, dayLabel: "Day " + (i + 1) }));
-      setP(np);
-    };
-    const [showAddDay, setShowAddDay] = useState(false);
     const repEx = (di, ei, nx, bk = "block1") => {
       const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = [...np[bk][di].exercises];
       const o = np[bk][di].exercises[ei]; np[bk][di].exercises[ei] = { ...nx, section: o.section, sets: o.sets, reps: o.reps, rest: o.rest, weight: o.weight, rpe: o.rpe, notes: o.notes || "", ssGroup: o.ssGroup };
@@ -2101,7 +2084,6 @@ export default function App() {
                     <span style={{ fontWeight: 700, fontSize: 14, color: K.tx }}>{day.dayLabel}</span>
                     <span style={{ fontSize: 12, color: K.tm }}>{day.focus}</span>
                     <span style={{ fontSize: 11, color: K.td, marginLeft: "auto" }}>{day.exercises.filter(e => e.section === "Strength").length} exercises</span>
-                    {p.block1.length > 1 && <button onClick={e => { e.stopPropagation(); if(confirm("Remove " + day.dayLabel + "?")) rmDay(di); }} style={{ background: "none", border: "none", color: K.dg, cursor: "pointer", padding: "2px 6px", fontSize: 11, opacity: 0.7 }} title="Remove day">✕</button>}
                   </div>
 
                   {!isCollapsed && <div style={{ border: "1px solid " + K.bd, borderTop: "none", borderRadius: "0 0 10px 10px", padding: isMobile ? 8 : 12 }}>
@@ -2171,23 +2153,6 @@ export default function App() {
                 </div>
               );
             })}
-
-            {/* Add Day */}
-            <div style={{ marginBottom: 24 }}>
-              {!showAddDay ? (
-                <button onClick={() => setShowAddDay(true)} style={{ width: "100%", padding: "12px 16px", border: "2px dashed " + K.bd, borderRadius: 10, background: "transparent", color: K.tm, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>{I.plus} Add Training Day</button>
-              ) : (
-                <div style={{ padding: 14, border: "1px solid " + K.bd, borderRadius: 10, background: K.sf }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: K.tx, marginBottom: 10 }}>Select day type:</div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {[["A","Push + Squat","#5dade2"],["B","Pull + Hinge","#f0a030"],["Q","Quad + Push","#5dade2"],["H","Hinge + Pull","#f0a030"],["G","Glute Focus","#e74c3c"],["F","Full Body","#2ecc71"]].map(([t,l,c]) => (
-                      <button key={t} onClick={() => addDay(t)} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid " + c + "50", background: c + "20", color: c, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{l}</button>
-                    ))}
-                    <button onClick={() => setShowAddDay(false)} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid " + K.bd, background: "transparent", color: K.td, fontSize: 12, cursor: "pointer" }}>Cancel</button>
-                  </div>
-                </div>
-              )}
-            </div>
 
             {/* Running */}
             <div style={{ marginTop: 8, marginBottom: 24 }}>
