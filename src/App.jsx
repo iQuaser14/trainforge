@@ -1833,8 +1833,9 @@ export default function App() {
         const oldExs = oldDay.exercises || [];
         // Preserve block2 Finisher exercises independently
         const oldFinishers = oldExs.filter(e => e.section === "Finisher");
-        const newExs = day.exercises.filter(e => e.section !== "Finisher").map((b1ex, ei) => {
-          const oldNonFin = oldExs.filter(e => e.section !== "Finisher");
+        const b1NonFin = day.exercises.filter(e => e.section !== "Finisher");
+        const oldNonFin = oldExs.filter(e => e.section !== "Finisher");
+        const newExs = b1NonFin.map((b1ex, ei) => {
           const oldEx = oldNonFin[ei];
           if (oldEx && oldEx.id === b1ex.id) {
             return { ...oldEx, section: b1ex.section, ssGroup: b1ex.ssGroup, circuit: b1ex.circuit };
@@ -1854,6 +1855,11 @@ export default function App() {
       if (bk === "block1") syncBlock2Structure(np);
       setP(np);
     };
+    const rmSection = (di, sec, bk = "block1") => {
+      const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = np[bk][di].exercises.filter(e => e.section !== sec);
+      if (bk === "block1") syncBlock2Structure(np);
+      setP(np);
+    };
     const repEx = (di, ei, nx, bk = "block1") => {
       const np = { ...p }; np[bk] = [...np[bk]]; np[bk][di] = { ...np[bk][di] }; np[bk][di].exercises = [...np[bk][di].exercises];
       const o = np[bk][di].exercises[ei]; np[bk][di].exercises[ei] = { ...nx, section: o.section, sets: o.sets, reps: o.reps, rest: o.rest, weight: o.weight, rpe: o.rpe, notes: o.notes || "", ssGroup: o.ssGroup };
@@ -1865,9 +1871,11 @@ export default function App() {
       const exs = [...np[bk][di].exercises];
       const ic = ex.category === "compound"; const lc = p.levelCfg || {};
       const ne = { ...ex, section: sec, sets: ic ? (lc.compoundSets || lc.cSets || 4) : (lc.accessorySets || lc.aSets || 3), reps: ic ? (lc.compoundReps || lc.cReps || "8") : (lc.accessoryReps || lc.aReps || "10"), rest: ic ? (lc.restCompound || lc.rest || 120) : (lc.restAccessory || lc.aRest || 90), weight: "—", rpe: ic ? (lc.compoundRPE || lc.cRPE || "") : (lc.accessoryRPE || lc.aRPE || ""), notes: "" };
+      const secOrder = ["Warm-Up", "Strength", "Core", "Finisher"];
+      const secIdx = secOrder.indexOf(sec);
       let ia = -1;
       for (let i = exs.length - 1; i >= 0; i--) { if (exs[i].section === sec) { ia = i + 1; break; } }
-      if (ia === -1) ia = exs.length;
+      if (ia === -1) { ia = exs.length; for (let s = secIdx + 1; s < secOrder.length; s++) { const fi = exs.findIndex(e => e.section === secOrder[s]); if (fi !== -1) { ia = fi; break; } } }
       exs.splice(ia, 0, ne);
       np[bk][di].exercises = exs;
       if (bk === "block1") syncBlock2Structure(np);
@@ -1940,7 +1948,6 @@ export default function App() {
       const ssMargin = (isSSMid || isSSEnd) ? 0 : 6;
 
       if (isCompact) {
-        // COMPACT (mobile + tablet): stacked layout
         return (
           <div style={{ background: K.cd, border: "1px solid " + K.bd, borderRadius: ssRadius, marginBottom: ssMargin, padding: 10, ...ssStyle }}>
             {isSSStart && <div style={{ fontSize: 9, fontWeight: 700, color: "#f0a030", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Superset</div>}
@@ -1949,40 +1956,39 @@ export default function App() {
                 {ex.name}
               </div>
               <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                <button onClick={() => toggleSS(di, ei)} title="SS" style={{ background: "none", border: "none", color: ex.ssGroup ? "#f0a030" : K.td, cursor: "pointer", padding: 4, opacity: 0.7, fontSize: 14, minWidth: 28, minHeight: 28 }}>SS</button>
+                {!bk && <button onClick={() => toggleSS(di, ei)} title="SS" style={{ background: "none", border: "none", color: ex.ssGroup ? "#f0a030" : K.td, cursor: "pointer", padding: 4, opacity: 0.7, fontSize: 14, minWidth: 28, minHeight: 28 }}>SS</button>}
                 <button onClick={() => rmEx(di, ei, targetBk)} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 4, opacity: 0.5, minWidth: 28, minHeight: 28 }}>{I.trash}</button>
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {ex1 && <div><span style={{ fontSize: 8, color: K.td }}>{bk ? "" : "W1-2"}</span>{ExFields({ bk: bk || "block1", di, ei, ex: ex1 })}</div>}
+              {ex1 && <div>{!bk && <span style={{ fontSize: 8, color: K.td }}>W1-2</span>}{ExFields({ bk: bk || "block1", di, ei, ex: ex1 })}</div>}
               {!bk && ex2 && <div><span style={{ fontSize: 8, color: K.td }}>W3-4</span>{ExFields({ bk: "block2", di, ei, ex: ex2 })}</div>}
             </div>
             <div style={{ display: "flex", gap: 6, marginTop: 6, alignItems: "center", flexWrap: "wrap" }}>
-              <input value={ex1?.notes || ""} onChange={e => upEx(bk || "block1", di, ei, "notes", e.target.value)} placeholder="Notes..." style={{ padding: "3px 8px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 80 }} />
-              <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={ex1?.rest || ""} onChange={e => upEx(bk || "block1", di, ei, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>
+              <input value={(ex1 || ex)?.notes || ""} onChange={e => upEx(bk || "block1", di, ei, "notes", e.target.value)} placeholder="Notes..." style={{ padding: "3px 8px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 80 }} />
+              <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={(ex1 || ex)?.rest || ""} onChange={e => upEx(bk || "block1", di, ei, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>
             </div>
           </div>
         );
       }
 
-      // DESKTOP: single-row grid
       return (
         <div style={{ background: K.cd, border: "1px solid " + K.bd, borderRadius: ssRadius, marginBottom: ssMargin, padding: "8px 12px", ...ssStyle }}>
           {isSSStart && <div style={{ fontSize: 9, fontWeight: 700, color: "#f0a030", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Superset</div>}
-          <div style={{ display: "grid", gridTemplateColumns: bk ? "minmax(140px, 1.5fr) minmax(300px, 1fr) 28px 28px" : "minmax(120px, 1.2fr) minmax(200px, 1fr) minmax(200px, 1fr) 28px 28px", gap: 8, alignItems: "center" }}>
+          <div style={{ display: "grid", gridTemplateColumns: bk ? "minmax(140px, 1.5fr) minmax(300px, 1fr) 28px" : "minmax(120px, 1.2fr) minmax(200px, 1fr) minmax(200px, 1fr) 28px 28px", gap: 8, alignItems: "center" }}>
             <div style={{ color: K.tx, fontWeight: 500, fontSize: 13, cursor: "pointer", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} onClick={() => setExPk({ di, sec: ex.section, idx: ei, rep: true, bk: targetBk })}>
               {ex.name}{ex.circuit && <span style={{ fontSize: 10, color: K.td, marginLeft: 4 }}>({ex.circuit.join(", ")})</span>}
             </div>
             {ex1 && <div style={{ display: "flex", gap: 4, alignItems: "center" }}>{ExFields({ bk: bk || "block1", di, ei, ex: ex1 })}<input value={ex1?.notes || ""} onChange={e => upEx(bk || "block1", di, ei, "notes", e.target.value)} placeholder="Notes" style={{ padding: "6px 6px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 40, minHeight: 30 }} /></div>}
             {!bk && <div style={{ display: "flex", gap: 4, alignItems: "center" }}>{ex2 && ExFields({ bk: "block2", di, ei, ex: ex2 })}<input value={ex2?.notes || ""} onChange={e => upEx("block2", di, ei, "notes", e.target.value)} placeholder="Notes" style={{ padding: "6px 6px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tm, fontSize: 10, fontFamily: ff, outline: "none", flex: 1, minWidth: 40, minHeight: 30 }} /></div>}
-            <button onClick={() => toggleSS(di, ei)} title="Toggle Superset" style={{ background: "none", border: "none", color: ex.ssGroup ? "#f0a030" : K.td, cursor: "pointer", padding: 2, opacity: 0.7, fontSize: 14 }}>SS</button>
+            {!bk && <button onClick={() => toggleSS(di, ei)} title="Toggle Superset" style={{ background: "none", border: "none", color: ex.ssGroup ? "#f0a030" : K.td, cursor: "pointer", padding: 2, opacity: 0.7, fontSize: 14 }}>SS</button>}
             <button onClick={() => rmEx(di, ei, targetBk)} style={{ background: "none", border: "none", color: K.td, cursor: "pointer", padding: 2, opacity: 0.5 }}>{I.trash}</button>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: bk ? "minmax(140px, 1.5fr) minmax(300px, 1fr) 28px 28px" : "minmax(120px, 1.2fr) minmax(200px, 1fr) minmax(200px, 1fr) 28px 28px", gap: 8, marginTop: 4, alignItems: "center" }}>
+          <div style={{ display: "grid", gridTemplateColumns: bk ? "minmax(140px, 1.5fr) minmax(300px, 1fr) 28px" : "minmax(120px, 1.2fr) minmax(200px, 1fr) minmax(200px, 1fr) 28px 28px", gap: 8, marginTop: 4, alignItems: "center" }}>
             <div></div>
-            <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={ex1?.rest || ""} onChange={e => upEx(bk || "block1", di, ei, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={(ex1 || ex)?.rest || ""} onChange={e => upEx(bk || "block1", di, ei, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>
             {!bk && <div style={{ display: "flex", gap: 4, alignItems: "center" }}><span style={{ fontSize: 8, color: K.td }}>Rest</span><input value={ex2?.rest || ""} onChange={e => upEx("block2", di, ei, "rest", e.target.value)} style={{ width: 36, padding: "3px 4px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 4, color: K.tx, fontSize: 11, fontFamily: mf, textAlign: "center", outline: "none" }} /></div>}
-            <div></div><div></div>
+            <div></div>{!bk && <div></div>}
           </div>
         </div>
       );
@@ -2044,41 +2050,53 @@ export default function App() {
                       <span></span><span></span>
                     </div>}
 
-                    {/* Exercises by section — non-Finisher: paired block1+block2 */}
-                    {(() => { let ls = ""; return day.exercises.filter(e => e.section !== "Finisher").map((ex1, ei) => {
-                      const origIdx = day.exercises.indexOf(ex1);
-                      const ex2 = day2 ? day2.exercises.filter(e => e.section !== "Finisher")[ei] : null;
-                      const secChanged = ex1.section !== ls; ls = ex1.section;
-                      const nonFinExs = day.exercises.filter(e => e.section !== "Finisher");
-                      const g = ex1.ssGroup;
-                      const isSSStart = g && (ei === 0 || nonFinExs[ei-1]?.ssGroup !== g);
-                      const isSSEnd = g && (ei === nonFinExs.length-1 || nonFinExs[ei+1]?.ssGroup !== g);
-                      const isSSMid = g && !isSSStart && !isSSEnd;
-                      return (<div key={origIdx}>
-                        {secChanged && <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: ei > 0 ? 16 : 0, marginBottom: 8 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 3, height: 14, borderRadius: 2, background: sc(ex1.section) }} /><span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: sc(ex1.section) }}>{ex1.section}</span></div>
-                          <Btn v="ghost" sm onClick={() => setExPk({ di, sec: ex1.section })} icon={I.plus}>Add</Btn>
-                        </div>}
-                        {ExRow({ di, ei: origIdx, ex1, ex2, isSSStart, isSSMid, isSSEnd })}
-                      </div>);
-                    }); })()}
+                    {/* Non-Finisher sections — always show all, paired block1+block2 */}
+                    {["Warm-Up", "Strength", "Core"].map(sec => {
+                      const allExs = day.exercises;
+                      const secExs = allExs.map((ex, ei) => ({ ex, ei })).filter(({ ex }) => ex.section === sec);
+                      return (
+                        <div key={sec} style={{ marginBottom: 12 }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 3, height: 14, borderRadius: 2, background: sc(sec) }} /><span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: sc(sec) }}>{sec}</span><span style={{ fontSize: 10, color: K.td }}>({secExs.length})</span></div>
+                            <div style={{ display: "flex", gap: 4 }}>
+                              {secExs.length > 0 && <Btn v="ghost" sm onClick={() => rmSection(di, sec)} style={{ color: K.dg, fontSize: 10 }}>✕ Remove</Btn>}
+                              <Btn v="ghost" sm onClick={() => setExPk({ di, sec })} icon={I.plus}>Add</Btn>
+                            </div>
+                          </div>
+                          {secExs.length === 0 && <div style={{ padding: "8px 12px", fontSize: 11, color: K.td, fontStyle: "italic", background: K.bg, borderRadius: 6 }}>No {sec.toLowerCase()} exercises — click + Add</div>}
+                          {secExs.map(({ ex: ex1, ei }) => {
+                            const nonFinB2 = day2 ? day2.exercises.filter(e => e.section !== "Finisher") : [];
+                            const nonFinB1Idx = allExs.filter(e => e.section !== "Finisher").indexOf(ex1);
+                            const ex2 = nonFinB2[nonFinB1Idx] || null;
+                            const g = ex1.ssGroup;
+                            const isSSStart = g && (ei === 0 || allExs[ei-1]?.ssGroup !== g);
+                            const isSSEnd = g && (ei === allExs.length-1 || allExs[ei+1]?.ssGroup !== g);
+                            const isSSMid = g && !isSSStart && !isSSEnd;
+                            return <div key={ei}>{ExRow({ di, ei, ex1, ex2, isSSStart, isSSMid, isSSEnd })}</div>;
+                          })}
+                        </div>
+                      );
+                    })}
 
-                    {/* Finisher section — independent per block */}
-                    <div style={{ marginTop: 16, marginBottom: 8 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}><div style={{ width: 3, height: 14, borderRadius: 2, background: sc("Finisher") }} /><span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: sc("Finisher") }}>Finisher</span></div>
+                    {/* Finisher section — independent per block, always visible */}
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}><div style={{ width: 3, height: 14, borderRadius: 2, background: sc("Finisher") }} /><span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: sc("Finisher") }}>Finisher</span></div>
                       {["block1", "block2"].map(bk => {
                         const bkData = bk === "block1" ? day : day2;
                         if (!bkData) return null;
                         const finExs = (bkData.exercises || []).map((ex, ei) => ({ ex, ei })).filter(({ ex }) => ex.section === "Finisher");
                         const label = bk === "block1" ? "W1-2" : "W3-4";
                         return (
-                          <div key={bk} style={{ marginBottom: 10, padding: "8px 10px", background: bk === "block2" ? "rgba(200,255,46,0.03)" : "transparent", borderRadius: 8, border: bk === "block2" ? "1px dashed " + K.bd : "none" }}>
+                          <div key={bk} style={{ marginBottom: 8, padding: "8px 10px", background: bk === "block2" ? "rgba(200,255,46,0.03)" : "transparent", borderRadius: 8, border: bk === "block2" ? "1px dashed " + K.bd : "none" }}>
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                              <span style={{ fontSize: 10, fontWeight: 700, color: K.tm }}>{label}</span>
-                              <Btn v="ghost" sm onClick={() => setExPk({ di, sec: "Finisher", bk })} icon={I.plus}>Add</Btn>
+                              <span style={{ fontSize: 10, fontWeight: 700, color: K.tm }}>{label} <span style={{ color: K.td }}>({finExs.length})</span></span>
+                              <div style={{ display: "flex", gap: 4 }}>
+                                {finExs.length > 0 && <Btn v="ghost" sm onClick={() => rmSection(di, "Finisher", bk)} style={{ color: K.dg, fontSize: 10 }}>✕ Remove</Btn>}
+                                <Btn v="ghost" sm onClick={() => setExPk({ di, sec: "Finisher", bk })} icon={I.plus}>Add</Btn>
+                              </div>
                             </div>
                             {finExs.length === 0 && <div style={{ padding: "6px 10px", fontSize: 11, color: K.td, fontStyle: "italic" }}>No finisher — click + Add</div>}
-                            {finExs.map(({ ex: fex, ei: fei }) => ExRow({ di, ei: fei, ex1: fex, ex2: null, isSSStart: false, isSSMid: false, isSSEnd: false, bk }))}
+                            {finExs.map(({ ex: fex, ei: fei }) => <div key={fei}>{ExRow({ di, ei: fei, ex1: fex, ex2: null, isSSStart: false, isSSMid: false, isSSEnd: false, bk })}</div>)}
                           </div>
                         );
                       })}
