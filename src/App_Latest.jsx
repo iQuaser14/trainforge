@@ -338,7 +338,7 @@ function microProgress(exercises, level) {
     const p = parseWeight(ex.weight);
     if (!p || p.isPercent) {
       if (p && p.isPercent) return { ...ex, weight: "@" + Math.min(95, Math.round(p.value + 2.5)) + "%" };
-      return { ...ex };
+      return { ...ex, notes: (ex.notes ? ex.notes + " | " : "") + "push harder vs W1-2" };
     }
     const bump = p.perSide ? 0.5 : (level === "beginner" ? 1.25 : 2.5);
     const raw = p.value + bump;
@@ -404,9 +404,13 @@ function generateDay(dayType, phaseCfg, durationCfg, block, usedExercises, locat
     let notes = "";
     if (prev) {
       weight = progressWeight(prev.weight, inc, isCompound);
+      notes = prev.notes || "";
+      if (phaseCfg.tempo && !notes.includes("ecc")) notes = [notes, phaseCfg.tempo].filter(Boolean).join(" | ");
+    } else {
+      notes = phaseCfg.tempo || "";
     }
 
-    exercises.push({ ...ex, section: "Strength", sets: sets || 3, reps: reps || "8", rest: rest || 90, weight, rpe, notes: "" });
+    exercises.push({ ...ex, section: "Strength", sets: sets || 3, reps: reps || "8", rest: rest || 90, weight, rpe, notes: notes.trim() });
     usedExercises.add(ex.id);
   };
 
@@ -483,15 +487,15 @@ function generateDay(dayType, phaseCfg, durationCfg, block, usedExercises, locat
   // ─── FINISHER (Gabriele's EMOM/AMRAP/circuit style) ───
   const finTemplates = {
     gym: [
-      { name: "EMOM 9': 15 Wall Ball + 12 Burpees + 9 Row Cal", reps: "EMOM 9'", notes: "" },
-      { name: "AMRAP 9': 8 WB + 8 Box Jump + 8 DB Snatch", reps: "AMRAP 9'", notes: "" },
+      { name: "EMOM 9': 15 Wall Ball + 12 Burpees + 9 Row Cal", reps: "EMOM 9'", notes: "pacing: steady, no rest" },
+      { name: "AMRAP 9': 8 WB + 8 Box Jump + 8 DB Snatch", reps: "AMRAP 9'", notes: "4-5 round target" },
       { name: "4RFT: 250m Run + 10 Burpees + 12 Russian Swing", reps: "4 rounds FT", notes: "" },
       { name: "EMOM 12': 200m Row + 10 Burpees + 14 WB", reps: "EMOM 12'", notes: "" },
       { name: "3RFT: 300m Row + 12 Sit-Up + 10 KB Swing", reps: "3 rounds FT", notes: "" },
       { name: "EMOM 9': 8 Ski Cal + 6 Burpees + 6 DB Snatch", reps: "EMOM 9'", notes: "" },
       { name: "E2MOM x4: 250m Row + 10 Box Jump Over", reps: "E2MOM x4", notes: "" },
       { name: "AMRAP 7': 8 Kipping PU + 12 Air Squat + 10 Sit-Up", reps: "AMRAP 7'", notes: "" },
-      { name: "Circ 3R: 10 TRX Pull-Up + 10 Goblet Squat + 10 Russian Swing", reps: "3 rounds", notes: "" },
+      { name: "Circ 3R: 10 TRX Pull-Up + 10 Goblet Squat + 10 Russian Swing", reps: "3 rounds", notes: "rec 60s between rounds" },
       { name: "5R: 200m Run + 8 Burpees + 6 Thruster", reps: "5 rounds FT", notes: "" },
     ],
     home: [
@@ -502,7 +506,7 @@ function generateDay(dayType, phaseCfg, durationCfg, block, usedExercises, locat
     ],
   };
   const finPool = finTemplates[location] || finTemplates.gym;
-  const fin = phase === "deload" ? { name: "Light Circuit: 3R easy pace", reps: "3 rounds", notes: "" } : pickRandom(finPool, 1)[0];
+  const fin = phase === "deload" ? { name: "Light Circuit: 3R easy pace", reps: "3 rounds", notes: "60s rest between exercises, RPE 6" } : pickRandom(finPool, 1)[0];
   const finRounds = phase === "deload" ? 3 : durationCfg.hiitRounds;
   exercises.push({ id: "fin_" + dayType + "_" + block + "_" + Math.random().toString(36).slice(2,6), name: fin.name, category: "hiit", section: "Finisher", sets: finRounds, reps: fin.reps, rest: 60, weight: "—", rpe: phase === "deload" ? "6" : "8-9", notes: fin.notes || "" });
 
@@ -542,7 +546,10 @@ function generateProgram(client, previousProgram = null) {
         const rest = isComp ? phaseCfg.rest : phaseCfg.aRest;
         const inc = isComp ? phaseCfg.wInc : phaseCfg.wIncAcc;
         const newWeight = progressWeight(ex.weight, inc, isComp);
-        return { ...ex, sets, reps, rest, weight: newWeight, rpe, notes: "" };
+        const tempoNote = phaseCfg.tempo && !(ex.notes || "").includes("ecc") ? phaseCfg.tempo : "";
+        const prevNotes = (ex.notes || "").replace(/push harder vs W1-2/g, "").replace(/ecc \d+s/g, "").replace(/\s*\|\s*$/g, "").trim();
+        const notes = [prevNotes, tempoNote].filter(Boolean).join(" | ");
+        return { ...ex, sets, reps, rest, weight: newWeight, rpe, notes: notes.trim() };
       })
     }));
   } else {
