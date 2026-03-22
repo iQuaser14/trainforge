@@ -90,6 +90,8 @@ const EXERCISES = {
     { id: "aps23", name: "DB Bridged Floor Press", category: "accessory", equipment: "dumbbells", muscles: ["chest", "glutes"], focus: "A" },
     { id: "aps24", name: "Dip su Sedia", category: "accessory", equipment: "chair", muscles: ["triceps"], focus: "A" },
     { id: "aps25", name: "SL Goblet Squat (Chair)", category: "accessory", equipment: "dumbbell/chair", muscles: ["quads", "glutes"], focus: "A" },
+    { id: "aps26", name: "Chest Press", category: "accessory", equipment: "machine", muscles: ["chest", "triceps"], focus: "A" },
+    { id: "aps27", name: "Alzate Laterali", category: "accessory", equipment: "dumbbells", muscles: ["shoulders"], focus: "A" },
   ],
   accessory_pull_hinge: [
     { id: "aph1", name: "Hip Thrust", category: "accessory", equipment: "barbell", muscles: ["glutes"], focus: "B" },
@@ -118,6 +120,7 @@ const EXERCISES = {
     { id: "aph24", name: "Plank Row (Chair)", category: "accessory", equipment: "dumbbell/chair", muscles: ["back"], focus: "B" },
     { id: "aph25", name: "Bicep Curls DB", category: "accessory", equipment: "dumbbells", muscles: ["biceps"], focus: "B" },
     { id: "aph26", name: "DB Tricep Extension", category: "accessory", equipment: "dumbbells", muscles: ["triceps"], focus: "B" },
+    { id: "aph27", name: "TRX Pullups", category: "accessory", equipment: "TRX", muscles: ["back", "biceps"], focus: "B" },
   ],
   core: [
     { id: "co1", name: "Plank", category: "core", equipment: "none" },
@@ -136,6 +139,9 @@ const EXERCISES = {
     { id: "co14", name: "Plank Drag Through", category: "core", equipment: "dumbbell" },
     { id: "co15", name: "Plank Reach", category: "core", equipment: "none" },
     { id: "co16", name: "Reverse Crunch", category: "core", equipment: "none" },
+    { id: "co17", name: "Situp", category: "core", equipment: "none" },
+    { id: "co18", name: "Hollow Body Rocks", category: "core", equipment: "none" },
+    { id: "co19", name: "Wallsit", category: "core", equipment: "none" },
   ],
   hiit: [
     { id: "h1", name: "Burpees", category: "hiit", equipment: "none" },
@@ -164,6 +170,9 @@ const EXERCISES = {
     { id: "h24", name: "GHD", category: "hiit", equipment: "GHD machine" },
     { id: "h25", name: "Walking Lunges", category: "hiit", equipment: "dumbbells" },
     { id: "h26", name: "Lateral Slamball", category: "hiit", equipment: "slamball" },
+    { id: "h27", name: "Alternating Snatch", category: "hiit", equipment: "dumbbell/kettlebell" },
+    { id: "h28", name: "Double DB Snatch", category: "hiit", equipment: "dumbbells" },
+    { id: "h29", name: "Slamball", category: "hiit", equipment: "slamball" },
   ],
   running: [
     { id: "r1", name: "Easy Run", category: "running", equipment: "none" },
