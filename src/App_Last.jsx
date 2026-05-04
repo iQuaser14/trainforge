@@ -90,6 +90,8 @@ const EXERCISES = {
     { id: "aps23", name: "DB Bridged Floor Press", category: "accessory", equipment: "dumbbells", muscles: ["chest", "glutes"], focus: "A" },
     { id: "aps24", name: "Dip su Sedia", category: "accessory", equipment: "chair", muscles: ["triceps"], focus: "A" },
     { id: "aps25", name: "SL Goblet Squat (Chair)", category: "accessory", equipment: "dumbbell/chair", muscles: ["quads", "glutes"], focus: "A" },
+    { id: "aps26", name: "Chest Press", category: "accessory", equipment: "machine", muscles: ["chest", "triceps"], focus: "A" },
+    { id: "aps27", name: "Alzate Laterali", category: "accessory", equipment: "dumbbells", muscles: ["shoulders"], focus: "A" },
   ],
   accessory_pull_hinge: [
     { id: "aph1", name: "Hip Thrust", category: "accessory", equipment: "barbell", muscles: ["glutes"], focus: "B" },
@@ -118,6 +120,7 @@ const EXERCISES = {
     { id: "aph24", name: "Plank Row (Chair)", category: "accessory", equipment: "dumbbell/chair", muscles: ["back"], focus: "B" },
     { id: "aph25", name: "Bicep Curls DB", category: "accessory", equipment: "dumbbells", muscles: ["biceps"], focus: "B" },
     { id: "aph26", name: "DB Tricep Extension", category: "accessory", equipment: "dumbbells", muscles: ["triceps"], focus: "B" },
+    { id: "aph27", name: "TRX Pullups", category: "accessory", equipment: "TRX", muscles: ["back", "biceps"], focus: "B" },
   ],
   core: [
     { id: "co1", name: "Plank", category: "core", equipment: "none" },
@@ -136,6 +139,9 @@ const EXERCISES = {
     { id: "co14", name: "Plank Drag Through", category: "core", equipment: "dumbbell" },
     { id: "co15", name: "Plank Reach", category: "core", equipment: "none" },
     { id: "co16", name: "Reverse Crunch", category: "core", equipment: "none" },
+    { id: "co17", name: "Situp", category: "core", equipment: "none" },
+    { id: "co18", name: "Hollow Body Rocks", category: "core", equipment: "none" },
+    { id: "co19", name: "Wallsit", category: "core", equipment: "none" },
   ],
   hiit: [
     { id: "h1", name: "Burpees", category: "hiit", equipment: "none" },
@@ -164,6 +170,9 @@ const EXERCISES = {
     { id: "h24", name: "GHD", category: "hiit", equipment: "GHD machine" },
     { id: "h25", name: "Walking Lunges", category: "hiit", equipment: "dumbbells" },
     { id: "h26", name: "Lateral Slamball", category: "hiit", equipment: "slamball" },
+    { id: "h27", name: "Alternating Snatch", category: "hiit", equipment: "dumbbell/kettlebell" },
+    { id: "h28", name: "Double DB Snatch", category: "hiit", equipment: "dumbbells" },
+    { id: "h29", name: "Slamball", category: "hiit", equipment: "slamball" },
   ],
   running: [
     { id: "r1", name: "Easy Run", category: "running", equipment: "none" },
@@ -338,7 +347,7 @@ function microProgress(exercises, level) {
     const p = parseWeight(ex.weight);
     if (!p || p.isPercent) {
       if (p && p.isPercent) return { ...ex, weight: "@" + Math.min(95, Math.round(p.value + 2.5)) + "%" };
-      return { ...ex, notes: (ex.notes ? ex.notes + " | " : "") + "push harder vs W1-2" };
+      return { ...ex };
     }
     const bump = p.perSide ? 0.5 : (level === "beginner" ? 1.25 : 2.5);
     const raw = p.value + bump;
@@ -404,13 +413,9 @@ function generateDay(dayType, phaseCfg, durationCfg, block, usedExercises, locat
     let notes = "";
     if (prev) {
       weight = progressWeight(prev.weight, inc, isCompound);
-      notes = prev.notes || "";
-      if (phaseCfg.tempo && !notes.includes("ecc")) notes = [notes, phaseCfg.tempo].filter(Boolean).join(" | ");
-    } else {
-      notes = phaseCfg.tempo || "";
     }
 
-    exercises.push({ ...ex, section: "Strength", sets: sets || 3, reps: reps || "8", rest: rest || 90, weight, rpe, notes: notes.trim() });
+    exercises.push({ ...ex, section: "Strength", sets: sets || 3, reps: reps || "8", rest: rest || 90, weight, rpe, notes: "" });
     usedExercises.add(ex.id);
   };
 
@@ -487,15 +492,15 @@ function generateDay(dayType, phaseCfg, durationCfg, block, usedExercises, locat
   // ─── FINISHER (Gabriele's EMOM/AMRAP/circuit style) ───
   const finTemplates = {
     gym: [
-      { name: "EMOM 9': 15 Wall Ball + 12 Burpees + 9 Row Cal", reps: "EMOM 9'", notes: "pacing: steady, no rest" },
-      { name: "AMRAP 9': 8 WB + 8 Box Jump + 8 DB Snatch", reps: "AMRAP 9'", notes: "4-5 round target" },
+      { name: "EMOM 9': 15 Wall Ball + 12 Burpees + 9 Row Cal", reps: "EMOM 9'", notes: "" },
+      { name: "AMRAP 9': 8 WB + 8 Box Jump + 8 DB Snatch", reps: "AMRAP 9'", notes: "" },
       { name: "4RFT: 250m Run + 10 Burpees + 12 Russian Swing", reps: "4 rounds FT", notes: "" },
       { name: "EMOM 12': 200m Row + 10 Burpees + 14 WB", reps: "EMOM 12'", notes: "" },
       { name: "3RFT: 300m Row + 12 Sit-Up + 10 KB Swing", reps: "3 rounds FT", notes: "" },
       { name: "EMOM 9': 8 Ski Cal + 6 Burpees + 6 DB Snatch", reps: "EMOM 9'", notes: "" },
       { name: "E2MOM x4: 250m Row + 10 Box Jump Over", reps: "E2MOM x4", notes: "" },
       { name: "AMRAP 7': 8 Kipping PU + 12 Air Squat + 10 Sit-Up", reps: "AMRAP 7'", notes: "" },
-      { name: "Circ 3R: 10 TRX Pull-Up + 10 Goblet Squat + 10 Russian Swing", reps: "3 rounds", notes: "rec 60s between rounds" },
+      { name: "Circ 3R: 10 TRX Pull-Up + 10 Goblet Squat + 10 Russian Swing", reps: "3 rounds", notes: "" },
       { name: "5R: 200m Run + 8 Burpees + 6 Thruster", reps: "5 rounds FT", notes: "" },
     ],
     home: [
@@ -506,7 +511,7 @@ function generateDay(dayType, phaseCfg, durationCfg, block, usedExercises, locat
     ],
   };
   const finPool = finTemplates[location] || finTemplates.gym;
-  const fin = phase === "deload" ? { name: "Light Circuit: 3R easy pace", reps: "3 rounds", notes: "60s rest between exercises, RPE 6" } : pickRandom(finPool, 1)[0];
+  const fin = phase === "deload" ? { name: "Light Circuit: 3R easy pace", reps: "3 rounds", notes: "" } : pickRandom(finPool, 1)[0];
   const finRounds = phase === "deload" ? 3 : durationCfg.hiitRounds;
   exercises.push({ id: "fin_" + dayType + "_" + block + "_" + Math.random().toString(36).slice(2,6), name: fin.name, category: "hiit", section: "Finisher", sets: finRounds, reps: fin.reps, rest: 60, weight: "—", rpe: phase === "deload" ? "6" : "8-9", notes: fin.notes || "" });
 
@@ -546,10 +551,7 @@ function generateProgram(client, previousProgram = null) {
         const rest = isComp ? phaseCfg.rest : phaseCfg.aRest;
         const inc = isComp ? phaseCfg.wInc : phaseCfg.wIncAcc;
         const newWeight = progressWeight(ex.weight, inc, isComp);
-        const tempoNote = phaseCfg.tempo && !(ex.notes || "").includes("ecc") ? phaseCfg.tempo : "";
-        const prevNotes = (ex.notes || "").replace(/push harder vs W1-2/g, "").replace(/ecc \d+s/g, "").replace(/\s*\|\s*$/g, "").trim();
-        const notes = [prevNotes, tempoNote].filter(Boolean).join(" | ");
-        return { ...ex, sets, reps, rest, weight: newWeight, rpe, notes: notes.trim() };
+        return { ...ex, sets, reps, rest, weight: newWeight, rpe, notes: "" };
       })
     }));
   } else {
@@ -1701,7 +1703,8 @@ export default function App() {
           const exs = (day.exercises || []).filter(e => validSections.has(e.section));
 
           const estHeight = 12 + exs.length * 6.5 + 8;
-          if (y + estHeight > H - 10) { doc.addPage(); y = margin; }
+          if (di > 0) { doc.addPage(); y = margin; }
+          else if (y + estHeight > H - 10) { doc.addPage(); y = margin; }
 
           // Day header
           doc.setFillColor(15, 30, 75);
@@ -2268,7 +2271,7 @@ export default function App() {
 
   function ExPick({ section, dayType, location, onSelect, onClose }) {
     const [ft, setFt] = useState("");
-    const getSectionCats = () => { if (section === "Warm-Up") return ["mobility"]; if (section === "Core") return ["core"]; if (section === "Finisher") return ["hiit"]; if (section === "Strength") return ["compound_push_squat", "compound_pull_hinge", "accessory_push_squat", "accessory_pull_hinge"]; return Object.keys(EXERCISES); };
+    const getSectionCats = () => Object.keys(EXERCISES);
     const fl = getSectionCats().flatMap(c => filterLoc(EXERCISES[c] || [], location || "gym")).filter(e => e.name.toLowerCase().includes(ft.toLowerCase()));
     return (<Mdl title={"Select — " + section} onClose={onClose} wide><div style={{ position: "relative", marginBottom: 16 }}><input value={ft} onChange={e => setFt(e.target.value)} placeholder="Search..." style={{ width: "100%", padding: "10px 14px 10px 36px", background: K.bg, border: "1px solid " + K.bd, borderRadius: 8, color: K.tx, fontSize: 13, fontFamily: ff, outline: "none", boxSizing: "border-box" }} /><div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: K.td }}>{I.search}</div></div><div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8, maxHeight: 400, overflowY: "auto" }}>{fl.map(ex => <div key={ex.id} onClick={() => onSelect(ex)} style={{ padding: "12px 14px", background: K.cd, border: "1px solid " + K.bd, borderRadius: 8, cursor: "pointer", transition: "all 0.12s" }} onMouseEnter={e => { e.currentTarget.style.borderColor = K.ac; e.currentTarget.style.background = K.ab; }} onMouseLeave={e => { e.currentTarget.style.borderColor = K.bd; e.currentTarget.style.background = K.cd; }}><div style={{ fontWeight: 600, fontSize: 13, color: K.tx, marginBottom: 4 }}>{ex.name}</div><div style={{ fontSize: 11, color: K.td }}>{ex.category}{ex.equipment ? " · " + ex.equipment : ""}{ex.muscles ? " · " + ex.muscles.join(", ") : ""}</div></div>)}</div></Mdl>);
   }
