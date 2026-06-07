@@ -732,7 +732,7 @@ RULES:
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 4096,
+        max_tokens: 16384,
         messages: [{
           role: "user",
           content: [
