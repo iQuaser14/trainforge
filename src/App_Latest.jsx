@@ -92,8 +92,8 @@ const EXERCISES = {
     { id: "aps25", name: "SL Goblet Squat (Chair)", category: "accessory", equipment: "dumbbell/chair", muscles: ["quads", "glutes"], focus: "A" },
     { id: "aps26", name: "Chest Press", category: "accessory", equipment: "machine", muscles: ["chest", "triceps"], focus: "A" },
     { id: "aps27", name: "Alzate Laterali", category: "accessory", equipment: "dumbbells", muscles: ["shoulders"], focus: "A" },
-    { id: "aps28", name: "Single Leg Squat", category: "accessory", equipment: "none", muscles: ["quads", "glutes"], focus: "A" },
-    { id: "aps29", name: "Shrimp Squat", category: "accessory", equipment: "none", muscles: ["quads", "glutes"], focus: "A" },
+    { id: "aps28", name: "French Press", category: "accessory", equipment: "barbell/dumbbells", muscles: ["triceps"], focus: "A" },
+    { id: "aps29", name: "Lateral Lunges", category: "accessory", equipment: "dumbbells", muscles: ["quads", "glutes", "adductors"], focus: "A" },
   ],
   accessory_pull_hinge: [
     { id: "aph1", name: "Hip Thrust", category: "accessory", equipment: "barbell", muscles: ["glutes"], focus: "B" },
@@ -123,6 +123,7 @@ const EXERCISES = {
     { id: "aph25", name: "Bicep Curls DB", category: "accessory", equipment: "dumbbells", muscles: ["biceps"], focus: "B" },
     { id: "aph26", name: "DB Tricep Extension", category: "accessory", equipment: "dumbbells", muscles: ["triceps"], focus: "B" },
     { id: "aph27", name: "TRX Pullups", category: "accessory", equipment: "TRX", muscles: ["back", "biceps"], focus: "B" },
+    { id: "aph28", name: "Hamstring Curls Fitball", category: "accessory", equipment: "fitball", muscles: ["hamstrings", "glutes"], focus: "B" },
   ],
   core: [
     { id: "co1", name: "Plank", category: "core", equipment: "none" },
@@ -144,6 +145,11 @@ const EXERCISES = {
     { id: "co17", name: "Situp", category: "core", equipment: "none" },
     { id: "co18", name: "Hollow Body Rocks", category: "core", equipment: "none" },
     { id: "co19", name: "Wallsit", category: "core", equipment: "none" },
+    { id: "co20", name: "Plank Fitball", category: "core", equipment: "fitball" },
+    { id: "co21", name: "Stir The Pot Fitball", category: "core", equipment: "fitball" },
+    { id: "co22", name: "Wood Chopper", category: "core", equipment: "cable/dumbbell" },
+    { id: "co23", name: "Kneeling Halo", category: "core", equipment: "kettlebell" },
+    { id: "co24", name: "Wallwalk", category: "core", equipment: "none" },
   ],
   hiit: [
     { id: "h1", name: "Burpees", category: "hiit", equipment: "none" },
@@ -175,6 +181,8 @@ const EXERCISES = {
     { id: "h27", name: "Alternating Snatch", category: "hiit", equipment: "dumbbell/kettlebell" },
     { id: "h28", name: "Double DB Snatch", category: "hiit", equipment: "dumbbells" },
     { id: "h29", name: "Slamball", category: "hiit", equipment: "slamball" },
+    { id: "h30", name: "Pogo Jumps", category: "hiit", equipment: "none" },
+    { id: "h31", name: "One Leg Landing", category: "hiit", equipment: "box" },
   ],
   running: [
     { id: "r1", name: "Easy Run", category: "running", equipment: "none" },

@@ -92,8 +92,6 @@ const EXERCISES = {
     { id: "aps25", name: "SL Goblet Squat (Chair)", category: "accessory", equipment: "dumbbell/chair", muscles: ["quads", "glutes"], focus: "A" },
     { id: "aps26", name: "Chest Press", category: "accessory", equipment: "machine", muscles: ["chest", "triceps"], focus: "A" },
     { id: "aps27", name: "Alzate Laterali", category: "accessory", equipment: "dumbbells", muscles: ["shoulders"], focus: "A" },
-    { id: "aps28", name: "French Press", category: "accessory", equipment: "barbell/dumbbells", muscles: ["triceps"], focus: "A" },
-    { id: "aps29", name: "Lateral Lunges", category: "accessory", equipment: "dumbbells", muscles: ["quads", "glutes", "adductors"], focus: "A" },
   ],
   accessory_pull_hinge: [
     { id: "aph1", name: "Hip Thrust", category: "accessory", equipment: "barbell", muscles: ["glutes"], focus: "B" },
@@ -123,7 +121,6 @@ const EXERCISES = {
     { id: "aph25", name: "Bicep Curls DB", category: "accessory", equipment: "dumbbells", muscles: ["biceps"], focus: "B" },
     { id: "aph26", name: "DB Tricep Extension", category: "accessory", equipment: "dumbbells", muscles: ["triceps"], focus: "B" },
     { id: "aph27", name: "TRX Pullups", category: "accessory", equipment: "TRX", muscles: ["back", "biceps"], focus: "B" },
-    { id: "aph28", name: "Hamstring Curls Fitball", category: "accessory", equipment: "fitball", muscles: ["hamstrings", "glutes"], focus: "B" },
   ],
   core: [
     { id: "co1", name: "Plank", category: "core", equipment: "none" },
@@ -145,11 +142,6 @@ const EXERCISES = {
     { id: "co17", name: "Situp", category: "core", equipment: "none" },
     { id: "co18", name: "Hollow Body Rocks", category: "core", equipment: "none" },
     { id: "co19", name: "Wallsit", category: "core", equipment: "none" },
-    { id: "co20", name: "Plank Fitball", category: "core", equipment: "fitball" },
-    { id: "co21", name: "Stir The Pot Fitball", category: "core", equipment: "fitball" },
-    { id: "co22", name: "Wood Chopper", category: "core", equipment: "cable/dumbbell" },
-    { id: "co23", name: "Kneeling Halo", category: "core", equipment: "kettlebell" },
-    { id: "co24", name: "Wallwalk", category: "core", equipment: "none" },
   ],
   hiit: [
     { id: "h1", name: "Burpees", category: "hiit", equipment: "none" },
@@ -181,8 +173,6 @@ const EXERCISES = {
     { id: "h27", name: "Alternating Snatch", category: "hiit", equipment: "dumbbell/kettlebell" },
     { id: "h28", name: "Double DB Snatch", category: "hiit", equipment: "dumbbells" },
     { id: "h29", name: "Slamball", category: "hiit", equipment: "slamball" },
-    { id: "h30", name: "Pogo Jumps", category: "hiit", equipment: "none" },
-    { id: "h31", name: "One Leg Landing", category: "hiit", equipment: "box" },
   ],
   running: [
     { id: "r1", name: "Easy Run", category: "running", equipment: "none" },
@@ -657,6 +647,7 @@ function ImportModal({ cls, setCls, prgs, setPrgs, onClose, notify, dbSave, clTo
   const [preview, setPreview] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [jsonText, setJsonText] = useState("");
+  const [apiKey, setApiKey] = useState(localStorage.getItem("tf_anthropic_key") || "");
 
   const PARSE_PROMPT = `You are a fitness program parser. Given a PDF of a training program, extract ALL data into this EXACT JSON format. Respond ONLY with valid JSON, no markdown, no backticks, no explanation.
 
@@ -729,19 +720,40 @@ RULES:
   });
 
   const parsePDF = async (file) => {
+    if (!apiKey) throw new Error("Please enter your Anthropic API key");
     const b64 = await toBase64(file);
-    const resp = await fetch("/api/parse-pdf", {
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pdfBase64: b64, fileName: file.name })
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4096,
+        messages: [{
+          role: "user",
+          content: [
+            { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } },
+            { type: "text", text: PARSE_PROMPT }
+          ]
+        }]
+      })
     });
     if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ error: "Network error" }));
-      throw new Error(err.error || "API error " + resp.status);
+      const err = await resp.json().catch(() => ({ error: { message: "Network error" } }));
+      throw new Error(err.error?.message || "API error " + resp.status);
     }
     const data = await resp.json();
-    if (data.parseError) throw new Error("Parse error: " + data.parseError + "\nRaw: " + (data.raw || "").substring(0, 200));
-    return data;
+    const text = (data.content || []).map(c => c.text || "").join("");
+    const clean = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    try {
+      return JSON.parse(clean);
+    } catch (e) {
+      throw new Error("Parse error: invalid JSON\nRaw: " + clean.substring(0, 300));
+    }
   };
 
   const handleFiles = (newFiles) => {
@@ -907,6 +919,11 @@ RULES:
       {tab === "pdf" && (
         <div>
           <p style={{ color: K.tm, fontSize: 13, marginBottom: 16 }}>Upload your training program PDFs. Claude AI will automatically extract exercises, sets, reps, weights, and structure.</p>
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: K.td, display: "block", marginBottom: 4 }}>Anthropic API Key</label>
+            <input type="password" value={apiKey} onChange={e => { setApiKey(e.target.value); localStorage.setItem("tf_anthropic_key", e.target.value); }} placeholder="sk-ant-..." style={{ width: "100%", padding: "8px 12px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 8, color: K.tx, fontSize: 13, fontFamily: ff, outline: "none", boxSizing: "border-box" }} />
+          </div>
 
           {!preview && (
             <>
