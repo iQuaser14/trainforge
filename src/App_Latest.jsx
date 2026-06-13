@@ -92,8 +92,6 @@ const EXERCISES = {
     { id: "aps25", name: "SL Goblet Squat (Chair)", category: "accessory", equipment: "dumbbell/chair", muscles: ["quads", "glutes"], focus: "A" },
     { id: "aps26", name: "Chest Press", category: "accessory", equipment: "machine", muscles: ["chest", "triceps"], focus: "A" },
     { id: "aps27", name: "Alzate Laterali", category: "accessory", equipment: "dumbbells", muscles: ["shoulders"], focus: "A" },
-    { id: "aps28", name: "Single Leg Squat", category: "accessory", equipment: "none", muscles: ["quads", "glutes"], focus: "A" },
-    { id: "aps29", name: "Shrimp Squat", category: "accessory", equipment: "none", muscles: ["quads", "glutes"], focus: "A" },
   ],
   accessory_pull_hinge: [
     { id: "aph1", name: "Hip Thrust", category: "accessory", equipment: "barbell", muscles: ["glutes"], focus: "B" },
@@ -649,6 +647,7 @@ function ImportModal({ cls, setCls, prgs, setPrgs, onClose, notify, dbSave, clTo
   const [preview, setPreview] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [jsonText, setJsonText] = useState("");
+  const [apiKey, setApiKey] = useState(localStorage.getItem("tf_anthropic_key") || "");
 
   const PARSE_PROMPT = `You are a fitness program parser. Given a PDF of a training program, extract ALL data into this EXACT JSON format. Respond ONLY with valid JSON, no markdown, no backticks, no explanation.
 
@@ -720,20 +719,65 @@ RULES:
     r.readAsDataURL(file);
   });
 
+  // Attempt to repair truncated JSON by closing open brackets/braces
+  const repairJSON = (str) => {
+    let s = str.trim();
+    // Remove trailing comma
+    s = s.replace(/,\s*$/, "");
+    // Count open/close brackets
+    let braces = 0, brackets = 0;
+    for (const c of s) {
+      if (c === "{") braces++;
+      if (c === "}") braces--;
+      if (c === "[") brackets++;
+      if (c === "]") brackets--;
+    }
+    // Close any open arrays/objects
+    while (brackets > 0) { s += "]"; brackets--; }
+    while (braces > 0) { s += "}"; braces--; }
+    return s;
+  };
+
   const parsePDF = async (file) => {
+    if (!apiKey) throw new Error("Please enter your Anthropic API key");
     const b64 = await toBase64(file);
-    const resp = await fetch("/api/parse-pdf", {
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pdfBase64: b64, fileName: file.name })
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 32000,
+        messages: [{
+          role: "user",
+          content: [
+            { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } },
+            { type: "text", text: PARSE_PROMPT }
+          ]
+        }]
+      })
     });
     if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ error: "Network error" }));
-      throw new Error(err.error || "API error " + resp.status);
+      const err = await resp.json().catch(() => ({ error: { message: "Network error" } }));
+      throw new Error(err.error?.message || "API error " + resp.status);
     }
     const data = await resp.json();
-    if (data.parseError) throw new Error("Parse error: " + data.parseError + "\nRaw: " + (data.raw || "").substring(0, 200));
-    return data;
+    const text = (data.content || []).map(c => c.text || "").join("");
+    const clean = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    // Try direct parse first, then attempt repair if truncated
+    try {
+      return JSON.parse(clean);
+    } catch (e1) {
+      try {
+        return JSON.parse(repairJSON(clean));
+      } catch (e2) {
+        throw new Error("Parse error: invalid JSON\nRaw: " + clean.substring(0, 300));
+      }
+    }
   };
 
   const handleFiles = (newFiles) => {
@@ -853,6 +897,32 @@ RULES:
         newPrs.forEach(p => { if (!np[p.clientId]) np[p.clientId] = []; np[p.clientId].push(p); });
         return np;
       });
+
+      // Auto-add new exercises to library
+      const knownNames = new Set(Object.values(EXERCISES).flat().map(e => e.name.toLowerCase()));
+      let newExCount = 0;
+      newPrs.forEach(pr => {
+        ["block1", "block2"].forEach(bk => {
+          (pr[bk] || []).forEach(day => {
+            (day.exercises || []).forEach(ex => {
+              if (ex.name && !knownNames.has(ex.name.toLowerCase())) {
+                knownNames.add(ex.name.toLowerCase());
+                const sec = (ex.section || "").toLowerCase();
+                let cat = "accessory_push_squat";
+                if (sec.includes("warm") || sec.includes("mobility")) cat = "mobility";
+                else if (sec.includes("core")) cat = "core";
+                else if (sec.includes("finisher") || sec.includes("hiit")) cat = "hiit";
+                const newId = "imp_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
+                const newEx = { id: newId, name: ex.name, category: cat === "mobility" ? "mobility" : (cat === "core" ? "core" : (cat === "hiit" ? "hiit" : "accessory")), equipment: "various" };
+                if (!EXERCISES[cat]) EXERCISES[cat] = [];
+                EXERCISES[cat].push(newEx);
+                newExCount++;
+              }
+            });
+          });
+        });
+      });
+      if (newExCount > 0) notify(newExCount + " new exercises added to library", "info");
     }
     onClose();
     notify("Imported " + addedC + " clients, " + addedP + " programs");
@@ -899,6 +969,11 @@ RULES:
       {tab === "pdf" && (
         <div>
           <p style={{ color: K.tm, fontSize: 13, marginBottom: 16 }}>Upload your training program PDFs. Claude AI will automatically extract exercises, sets, reps, weights, and structure.</p>
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: K.td, display: "block", marginBottom: 4 }}>Anthropic API Key</label>
+            <input type="password" value={apiKey} onChange={e => { setApiKey(e.target.value); localStorage.setItem("tf_anthropic_key", e.target.value); }} placeholder="sk-ant-..." style={{ width: "100%", padding: "8px 12px", background: K.sf, border: "1px solid " + K.bd, borderRadius: 8, color: K.tx, fontSize: 13, fontFamily: ff, outline: "none", boxSizing: "border-box" }} />
+          </div>
 
           {!preview && (
             <>
